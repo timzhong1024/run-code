@@ -17,7 +17,13 @@ impl<'a> GoBackend<'a> {
     }
 }
 impl Backend for GoBackend<'_> {
-    fn prepare(&self, dir: &Path, code: &str, quiet: bool) -> Result<i32, RunFailure> {
+    fn prepare(
+        &self,
+        dir: &Path,
+        code: &str,
+        arguments: &[String],
+        quiet: bool,
+    ) -> Result<i32, RunFailure> {
         let toolchain = format!("go@{}", self.toolchain.version);
         let env = [("GOWORK".into(), "off".into())];
         run_checked_hidden(
@@ -52,6 +58,7 @@ impl Backend for GoBackend<'_> {
         }
         let mut args = vec!["exec".into(), toolchain.clone()];
         args.extend(strings(&["--", "go", "run", "."]));
+        args.extend(arguments.iter().cloned());
         let result = run_final("mise", &args, Some(dir), &env, quiet)?;
         Ok(result.exit_code.unwrap_or(1))
     }

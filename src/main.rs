@@ -2,11 +2,11 @@ mod cli;
 mod process;
 mod runner;
 mod skill;
+mod source;
 mod util;
 
 use clap::{Parser, error::ErrorKind};
 use cli::{Cli, Command};
-use std::io::{self, Read};
 
 fn main() {
     let cli = match Cli::try_parse() {
@@ -28,12 +28,17 @@ fn main() {
         return;
     }
 
-    let mut code = String::new();
-    if let Err(error) = io::stdin().read_to_string(&mut code) {
-        return exit_with_error(&format!("failed to read stdin: {error}"), 1);
-    }
+    let code = match source::read(cli.source.as_deref()) {
+        Ok(code) => code,
+        Err(error) => return exit_with_error(&error, 1),
+    };
     if code.is_empty() {
-        return exit_with_error("stdin did not contain source code", 2);
+        let input = if cli.source.is_some() {
+            "source file"
+        } else {
+            "stdin"
+        };
+        return exit_with_error(&format!("{input} did not contain source code"), 2);
     }
 
     match runner::run_snippet(&cli, &code) {

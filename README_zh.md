@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-在隔离的临时环境中，用指定版本的 runtime/toolchain 和依赖快速运行一段 Python、TypeScript、JavaScript、Rust、Go 或 C# 代码。
+在隔离的临时环境中，用指定版本的 runtime/toolchain 和依赖快速运行来自 stdin 或源文件的一段 Python、TypeScript、JavaScript、Rust、Go 或 C# 代码。
 
 ## 安装
 
@@ -37,6 +37,14 @@ GitHub Release 还会提供 macOS、Linux 和 Windows 的独立 binary。
 | C# / .NET | [mise](https://mise.jdx.dev/getting-started.html) |
 
 ## 示例
+
+### 源文件
+
+```bash
+run-code node@20 snippet.ts -- first --verbose
+```
+
+执行前，`run-code` 会读取源文件，并将内容复制到新建的隔离模板项目中。它不会在源文件所属的已有工程里运行，不会读取该工程的依赖，也不会复制同目录的其他文件。代码片段需要的依赖应通过 `--package` 明确添加；`--` 后的参数会传给代码进程。
 
 ### TypeScript
 
@@ -141,10 +149,13 @@ Codex 会自动发现这些目录中的 skill；详细约定见 [Codex Skills �
 
 ```text
 run-code [OPTIONS] TOOLCHAIN[@VERSION]
+run-code [OPTIONS] TOOLCHAIN[@VERSION] FILE [-- ARG ...]
 run-code skill
 ```
 
 - `TOOLCHAIN[@VERSION]`：选择语言及版本。支持 `python`、`node`、`rust`、`go` 和 `dotnet`；`javascript`、`typescript` 是 `node` 的别名，`csharp`、`cs` 是 `dotnet` 的别名，版本可以省略。
+- `FILE`：读取源文件，并将内容复制进新的隔离模板项目；不会使用文件所在的已有工程或同目录文件。省略时从 stdin 读取代码。
+- `ARG`：在 `--` 后提供并传给代码进程；stdin 输入同样可以传参。
 - `-p, --package SPEC`：添加临时依赖，可重复使用以安装多个包。依赖格式遵循对应生态；Python 版本使用 `NAME==VERSION`，Node、Rust、Go 和 .NET 使用 `NAME@VERSION`。Rust 还支持 `NAME[@VERSION][FEATURE,...]`，例如 `'tokio@1[full]'`。
 - `--commonjs`：让 Node 以 CommonJS 方式运行；默认使用支持顶层 `await` 的 ESM。
 - `--clean`：运行结束后删除临时项目；不指定时保留项目，默认输出的执行命令中会包含项目路径。
@@ -153,4 +164,4 @@ run-code skill
 - `-h, --help`：显示帮助。
 - `-V, --version`：显示版本。
 
-未指定版本时使用内置默认值：Python 3.14、Node latest、Rust stable、Go latest、.NET 10。C# 通过 .NET 10+ file-based app 运行。Python 和 Node 未指定 `--package` 时直接执行，不创建临时项目；需要依赖时才创建隔离项目。代码通过 stdin 输入，包管理器的下载缓存保持启用。默认只显示依赖安装和最终代码运行命令，并实时透传它们的 stdout/stderr；项目初始化仅在失败时输出诊断信息。
+未指定版本时使用内置默认值：Python 3.14、Node latest、Rust stable、Go latest、.NET 10。C# 通过 .NET 10+ file-based app 运行。使用 stdin 且未指定 `--package` 时，Python 和 Node 直接执行；使用文件输入时，即使没有依赖也始终创建隔离模板项目。包管理器的下载缓存保持启用。默认只显示依赖安装和最终代码运行命令，并实时透传它们的 stdout/stderr；项目初始化仅在失败时输出诊断信息。

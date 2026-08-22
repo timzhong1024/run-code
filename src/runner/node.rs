@@ -36,7 +36,7 @@ impl Backend for NodeBackend<'_> {
         self.packages.is_empty()
     }
 
-    fn run_direct(&self, code: &str, quiet: bool) -> Result<i32, RunFailure> {
+    fn run_direct(&self, code: &str, arguments: &[String], quiet: bool) -> Result<i32, RunFailure> {
         let suffix = if self.commonjs { ".cts" } else { ".mts" };
         let source = Builder::new()
             .prefix("run-code-")
@@ -49,7 +49,7 @@ impl Backend for NodeBackend<'_> {
             })?;
         write_source(source.path(), code)?;
 
-        let args = vec![
+        let mut args = vec![
             "env".into(),
             "exec".into(),
             "--node".into(),
@@ -59,12 +59,19 @@ impl Backend for NodeBackend<'_> {
             format!("tsx@{TSX_VERSION}"),
             source.path().to_string_lossy().into_owned(),
         ];
+        args.extend(arguments.iter().cloned());
         let cwd = std::env::temp_dir();
         let result = run_final("vp", &args, Some(&cwd), &[], quiet)?;
         Ok(result.exit_code.unwrap_or(1))
     }
 
-    fn prepare(&self, dir: &Path, code: &str, quiet: bool) -> Result<i32, RunFailure> {
+    fn prepare(
+        &self,
+        dir: &Path,
+        code: &str,
+        arguments: &[String],
+        quiet: bool,
+    ) -> Result<i32, RunFailure> {
         let file = self.file_name();
         let manifest = serde_json::to_string_pretty(&json!({
             "name": "run-code-snippet",
@@ -114,12 +121,36 @@ impl Backend for NodeBackend<'_> {
             quiet,
         )?;
 
-        let final_args = if quiet {
-            strings(&["exec", "tsx", file])
-        } else {
-            strings(&["run", "start"])
-        };
+        let final_args = final_command(file, arguments, quiet);
         let result = run_final("vp", &final_args, Some(dir), &[], quiet)?;
         Ok(result.exit_code.unwrap_or(1))
+    }
+}
+
+fn final_command(file: &str, arguments: &[String], quiet: bool) -> Vec<String> {
+    let mut command = if quiet {
+        strings(&["exec", "--", "tsx", file])
+    } else {
+        strings(&["run", "start"])
+    };
+    command.extend(arguments.iter().cloned());
+    command
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snippet_arguments_do_not_include_the_cli_separator() {
+        let arguments = vec!["first".into(), "--flag".into()];
+        assert_eq!(
+            final_command("snippet.ts", &arguments, false),
+            ["run", "start", "first", "--flag"]
+        );
+        assert_eq!(
+            final_command("snippet.ts", &arguments, true),
+            ["exec", "--", "tsx", "snippet.ts", "first", "--flag"]
+        );
     }
 }

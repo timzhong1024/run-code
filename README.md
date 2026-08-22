@@ -2,7 +2,7 @@
 
 [简体中文](README_zh.md)
 
-Run Python, TypeScript, JavaScript, Rust, Go, or C# snippets with a selected runtime/toolchain version and temporary dependencies in an isolated environment.
+Run Python, TypeScript, JavaScript, Rust, Go, or C# snippets from stdin or a source file with a selected runtime/toolchain version and temporary dependencies in an isolated environment.
 
 ## Installation
 
@@ -37,6 +37,14 @@ GitHub Releases also provide standalone binaries for macOS, Linux, and Windows.
 | C# / .NET | [mise](https://mise.jdx.dev/getting-started.html) |
 
 ## Examples
+
+### Source file
+
+```bash
+run-code node@20 snippet.ts -- first --verbose
+```
+
+The source file is read and its contents are copied into a newly created isolated template project before execution. `run-code` does not execute inside the source file's existing project, discover that project's dependencies, or copy sibling files. Add everything the snippet needs with `--package`; arguments after `--` are passed to the snippet.
 
 ### TypeScript
 
@@ -141,10 +149,13 @@ Report vulnerabilities privately through GitHub private vulnerability reporting.
 
 ```text
 run-code [OPTIONS] TOOLCHAIN[@VERSION]
+run-code [OPTIONS] TOOLCHAIN[@VERSION] FILE [-- ARG ...]
 run-code skill
 ```
 
 - `TOOLCHAIN[@VERSION]`: Select a language and optional version. Supported toolchains are `python`, `node`, `rust`, `go`, and `dotnet`; `javascript` and `typescript` are aliases for `node`, while `csharp` and `cs` are aliases for `dotnet`.
+- `FILE`: Read a source file and copy its contents into a new isolated template project. The file's existing project and sibling files are not used. When omitted, source code is read from stdin.
+- `ARG`: Pass arguments after `--` to the snippet process. This also works with stdin input.
 - `-p, --package SPEC`: Add a temporary dependency. Repeat the option to install multiple packages. Specs follow each ecosystem: Python uses `NAME==VERSION`; Node, Rust, Go, and .NET use `NAME@VERSION`. Rust also supports `NAME[@VERSION][FEATURE,...]`, such as `'tokio@1[full]'`.
 - `--commonjs`: Run Node code as CommonJS. The default is ESM with top-level `await` support.
 - `--clean`: Delete the generated project after execution. Without this option, the project is retained and its path appears in the displayed command.
@@ -153,4 +164,4 @@ run-code skill
 - `-h, --help`: Show help.
 - `-V, --version`: Show the version.
 
-When the version is omitted, built-in defaults are used: Python 3.14, Node latest, Rust stable, Go latest, and .NET 10. C# runs as a .NET 10+ file-based app. Python and Node execute directly without creating a project when no `--package` option is provided; an isolated project is created only when dependencies are needed. Source code is read from stdin, and package-manager download caches remain enabled. By default, `run-code` displays only dependency installation and final execution commands while streaming their stdout/stderr; project initialization output is shown only when initialization fails.
+When the version is omitted, built-in defaults are used: Python 3.14, Node latest, Rust stable, Go latest, and .NET 10. C# runs as a .NET 10+ file-based app. For stdin input, Python and Node execute directly when no `--package` option is provided. File input always creates an isolated template project, even without dependencies. Package-manager download caches remain enabled. By default, `run-code` displays only dependency installation and final execution commands while streaming their stdout/stderr; project initialization output is shown only when initialization fails.

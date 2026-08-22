@@ -19,7 +19,13 @@ impl<'a> RustBackend<'a> {
     }
 }
 impl Backend for RustBackend<'_> {
-    fn prepare(&self, dir: &Path, code: &str, quiet: bool) -> Result<i32, RunFailure> {
+    fn prepare(
+        &self,
+        dir: &Path,
+        code: &str,
+        arguments: &[String],
+        quiet: bool,
+    ) -> Result<i32, RunFailure> {
         let version = &self.toolchain.version;
         let mut init = strings(&["run", "--install"]);
         init.push(version.clone());
@@ -61,6 +67,10 @@ impl Backend for RustBackend<'_> {
         let mut args = strings(&["run", "--install"]);
         args.push(version.clone());
         args.extend(strings(&["cargo", "run", "--quiet"]));
+        if !arguments.is_empty() {
+            args.push("--".into());
+            args.extend(arguments.iter().cloned());
+        }
         let result = run_final("rustup", &args, Some(dir), &env, quiet)?;
         Ok(result.exit_code.unwrap_or(1))
     }
