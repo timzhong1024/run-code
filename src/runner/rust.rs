@@ -7,17 +7,9 @@ use directories::ProjectDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub struct RustBackend<'a> {
-    toolchain: &'a ToolchainSpec,
-    packages: &'a [String],
-}
-impl<'a> RustBackend<'a> {
-    pub fn new(toolchain: &'a ToolchainSpec, packages: &'a [String]) -> Self {
-        Self {
-            toolchain,
-            packages,
-        }
-    }
+pub(super) struct RustBackend<'a> {
+    pub(super) toolchain: &'a ToolchainSpec,
+    pub(super) packages: &'a [String],
 }
 impl Backend for RustBackend<'_> {
     fn prepare(
@@ -69,23 +61,20 @@ impl Backend for RustBackend<'_> {
         let mut args = strings(&["run", "--install"]);
         args.push(version.clone());
         args.extend(strings(&["cargo", "run", "--quiet"]));
-        if execution.has_custom_cwd() {
-            args.extend(strings(&["--manifest-path"]));
-            args.push(path_text(&dir.join("Cargo.toml")));
-        }
+        args.extend(strings(&["--manifest-path"]));
+        args.push(path_text(&dir.join("Cargo.toml")));
         if !arguments.is_empty() {
             args.push("--".into());
             args.extend(arguments.iter().cloned());
         }
-        let result = run_final(
+        run_final(
             "rustup",
             &args,
             Some(execution.cwd_or(dir)),
             &env,
             execution.environment(),
             quiet,
-        )?;
-        Ok(result.exit_code.unwrap_or(1))
+        )
     }
 }
 

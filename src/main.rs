@@ -52,7 +52,13 @@ fn main() {
         Ok(exit_code) => exit(exit_code),
         Err(error) => {
             eprintln!("run-code: {}", error.message);
-            if let Some(hint) = error.hint {
+            let hint = error.hint.or_else(|| {
+                error
+                    .missing_program
+                    .as_deref()
+                    .and_then(util::program_install_hint)
+            });
+            if let Some(hint) = hint {
                 eprintln!("hint: {hint}");
             }
             exit(error.exit_code.unwrap_or(1));

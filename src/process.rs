@@ -1,16 +1,11 @@
 use std::io::{self, Write};
 use std::path::Path;
-use std::process::{Command, Output};
-
-#[derive(Debug)]
-pub struct ProcessResult {
-    pub success: bool,
-    pub exit_code: Option<i32>,
-}
+use std::process::{Command, ExitStatus, Output};
 
 #[derive(Debug)]
 pub struct RunFailure {
     pub message: String,
+    pub hint: Option<String>,
     pub exit_code: Option<i32>,
     pub missing_program: Option<String>,
 }
@@ -19,6 +14,7 @@ impl RunFailure {
     pub fn message(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            hint: None,
             exit_code: None,
             missing_program: None,
         }
@@ -27,15 +23,17 @@ impl RunFailure {
     fn start(program: &str, error: io::Error) -> Self {
         Self {
             message: format!("failed to start {program}: {error}"),
+            hint: None,
             exit_code: None,
             missing_program: (error.kind() == io::ErrorKind::NotFound).then(|| program.to_string()),
         }
     }
 
-    fn process(stage: &str, process: ProcessResult) -> Self {
+    fn process(stage: &str, exit_code: Option<i32>) -> Self {
         Self {
             message: format!("{stage} failed"),
-            exit_code: process.exit_code,
+            hint: None,
+            exit_code,
             missing_program: None,
         }
     }
@@ -47,13 +45,8 @@ pub fn run_checked_hidden(
     args: &[String],
     cwd: Option<&Path>,
     env: &[(String, String)],
-) -> Result<ProcessResult, RunFailure> {
-    let result = run_setup(program, args, cwd, env, true)?;
-    if result.success {
-        Ok(result)
-    } else {
-        Err(RunFailure::process(stage, result))
-    }
+) -> Result<(), RunFailure> {
+    run_checked(stage, program, args, cwd, env, true)
 }
 
 pub fn run_checked(
@@ -63,12 +56,12 @@ pub fn run_checked(
     cwd: Option<&Path>,
     env: &[(String, String)],
     quiet: bool,
-) -> Result<ProcessResult, RunFailure> {
+) -> Result<(), RunFailure> {
     let result = run_setup(program, args, cwd, env, quiet)?;
-    if result.success {
-        Ok(result)
+    if result.success() {
+        Ok(())
     } else {
-        Err(RunFailure::process(stage, result))
+        Err(RunFailure::process(stage, result.code()))
     }
 }
 
@@ -79,17 +72,14 @@ pub fn run_final(
     env: &[(String, String)],
     unprinted_env: &[(String, String)],
     quiet: bool,
-) -> Result<ProcessResult, RunFailure> {
+) -> Result<i32, RunFailure> {
     if !quiet {
         eprintln!("+ {}", display_command(program, args, cwd, env));
     }
     let status = command(program, args, cwd, env, unprinted_env)
         .status()
         .map_err(|error| RunFailure::start(program, error))?;
-    Ok(ProcessResult {
-        success: status.success(),
-        exit_code: status.code(),
-    })
+    Ok(status.code().unwrap_or(1))
 }
 
 fn run_setup(
@@ -98,16 +88,13 @@ fn run_setup(
     cwd: Option<&Path>,
     env: &[(String, String)],
     quiet: bool,
-) -> Result<ProcessResult, RunFailure> {
+) -> Result<ExitStatus, RunFailure> {
     if !quiet {
         eprintln!("+ {}", display_command(program, args, cwd, env));
         let status = command(program, args, cwd, env, &[])
             .status()
             .map_err(|error| RunFailure::start(program, error))?;
-        return Ok(ProcessResult {
-            success: status.success(),
-            exit_code: status.code(),
-        });
+        return Ok(status);
     }
 
     let output = command(program, args, cwd, env, &[])
@@ -116,10 +103,7 @@ fn run_setup(
     if !output.status.success() {
         replay_output(&output);
     }
-    Ok(ProcessResult {
-        success: output.status.success(),
-        exit_code: output.status.code(),
-    })
+    Ok(output.status)
 }
 
 fn command(

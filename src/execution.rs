@@ -1,7 +1,6 @@
 use crate::cli::Cli;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default)]
 pub struct ExecutionContext {
     working_directory: Option<PathBuf>,
     environment: Vec<(String, String)>,

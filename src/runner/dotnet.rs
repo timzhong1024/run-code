@@ -5,18 +5,9 @@ use crate::process::{RunFailure, run_final};
 use crate::util::{path_text, strings, write_source};
 use std::path::Path;
 
-pub struct DotnetBackend<'a> {
-    toolchain: &'a ToolchainSpec,
-    packages: &'a [String],
-}
-
-impl<'a> DotnetBackend<'a> {
-    pub fn new(toolchain: &'a ToolchainSpec, packages: &'a [String]) -> Self {
-        Self {
-            toolchain,
-            packages,
-        }
-    }
+pub(super) struct DotnetBackend<'a> {
+    pub(super) toolchain: &'a ToolchainSpec,
+    pub(super) packages: &'a [String],
 }
 
 impl Backend for DotnetBackend<'_> {
@@ -35,24 +26,19 @@ impl Backend for DotnetBackend<'_> {
         let toolchain = format!("dotnet@{}", self.toolchain.version);
         let mut args = vec!["exec".into(), toolchain];
         args.extend(strings(&["--", "dotnet", "run"]));
-        args.push(if execution.has_custom_cwd() {
-            path_text(&source_path)
-        } else {
-            "snippet.cs".into()
-        });
+        args.push(path_text(&source_path));
         if !arguments.is_empty() {
             args.push("--".into());
             args.extend(arguments.iter().cloned());
         }
-        let result = run_final(
+        run_final(
             "mise",
             &args,
             Some(execution.cwd_or(dir)),
             &[],
             execution.environment(),
             quiet,
-        )?;
-        Ok(result.exit_code.unwrap_or(1))
+        )
     }
 }
 
