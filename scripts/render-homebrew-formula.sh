@@ -25,9 +25,8 @@ base_url="https://github.com/$repository/releases/download/$tag"
 mkdir -p "$(dirname "$output")"
 cat >"$output" <<RUBY
 class RunCode < Formula
-  desc "Run code snippets with selected toolchains and temporary dependencies"
+  desc "Execute snippets with selected toolchains and temporary dependencies"
   homepage "https://github.com/$repository"
-  version "$version"
   license "MIT"
 
   on_macos do
