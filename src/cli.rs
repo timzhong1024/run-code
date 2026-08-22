@@ -1,6 +1,7 @@
 #[cfg(test)]
 use clap::CommandFactory;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 pub const DEFAULT_PYTHON_TOOLCHAIN: &str = "3.14";
@@ -82,7 +83,7 @@ impl FromStr for ToolchainSpec {
 #[command(
     name = "run-code",
     version,
-    about = "Run stdin with a selected toolchain and temporary dependencies"
+    about = "Run a code snippet with a selected toolchain and temporary dependencies"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -91,6 +92,14 @@ pub struct Cli {
     /// Runtime/compiler in NAME or NAME@VERSION form
     #[arg(value_name = "TOOLCHAIN[@VERSION]")]
     pub toolchain: Option<ToolchainSpec>,
+
+    /// Source file to copy into an isolated template project; reads stdin when omitted
+    #[arg(value_name = "FILE")]
+    pub source: Option<PathBuf>,
+
+    /// Arguments passed to the code snippet
+    #[arg(last = true, value_name = "ARG")]
+    pub args: Vec<String>,
 
     /// Dependency specification; Python supports NAME==VERSION
     #[arg(short = 'p', long = "package", value_name = "SPEC")]
@@ -129,6 +138,8 @@ impl Cli {
                 || self.commonjs
                 || self.clean
                 || self.quiet
+                || self.source.is_some()
+                || !self.args.is_empty()
             {
                 Some("the skill command does not accept execution arguments".into())
             } else {
@@ -153,7 +164,7 @@ mod tests {
             .get_arguments()
             .filter(|arg| arg.get_id() != "help" && arg.get_id() != "version")
             .count();
-        assert_eq!(visible, 5);
+        assert_eq!(visible, 7);
     }
 
     #[test]
@@ -161,6 +172,22 @@ mod tests {
         let cli = Cli::try_parse_from(["run-code", "node@20", "--commonjs"]).unwrap();
         assert_eq!(cli.toolchain().display(), "node@20");
         assert!(cli.commonjs);
+    }
+
+    #[test]
+    fn source_file_and_trailing_arguments_are_distinct() {
+        let cli =
+            Cli::try_parse_from(["run-code", "node@20", "snippet.ts", "--", "first", "--flag"])
+                .unwrap();
+        assert_eq!(cli.source, Some(PathBuf::from("snippet.ts")));
+        assert_eq!(cli.args, ["first", "--flag"]);
+    }
+
+    #[test]
+    fn stdin_can_also_receive_trailing_arguments() {
+        let cli = Cli::try_parse_from(["run-code", "python", "--", "first"]).unwrap();
+        assert!(cli.source.is_none());
+        assert_eq!(cli.args, ["first"]);
     }
 
     #[test]

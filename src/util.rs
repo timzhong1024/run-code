@@ -8,7 +8,7 @@ pub fn write_source(path: &Path, code: &str) -> Result<(), RunFailure> {
             .map_err(|e| RunFailure::message(format!("failed to create source directory: {e}")))?;
     }
     fs::write(path, code)
-        .map_err(|e| RunFailure::message(format!("failed to store stdin source: {e}")))
+        .map_err(|e| RunFailure::message(format!("failed to store snippet source: {e}")))
 }
 
 pub fn path_text(path: &Path) -> String {

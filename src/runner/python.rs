@@ -22,18 +22,25 @@ impl Backend for PythonBackend<'_> {
         self.packages.is_empty()
     }
 
-    fn run_direct(&self, code: &str, quiet: bool) -> Result<i32, RunFailure> {
+    fn run_direct(&self, code: &str, arguments: &[String], quiet: bool) -> Result<i32, RunFailure> {
         let mut args = strings(&["run", "--quiet"]);
         args.extend(strings(&["--isolated", "--managed-python", "--python"]));
         args.push(self.toolchain.version.clone());
         args.extend(strings(&["python", "-c"]));
         args.push(code.into());
+        args.extend(arguments.iter().cloned());
         let cwd = std::env::temp_dir();
         let result = run_final("uv", &args, Some(&cwd), &[], quiet)?;
         Ok(result.exit_code.unwrap_or(1))
     }
 
-    fn prepare(&self, dir: &Path, code: &str, quiet: bool) -> Result<i32, RunFailure> {
+    fn prepare(
+        &self,
+        dir: &Path,
+        code: &str,
+        arguments: &[String],
+        quiet: bool,
+    ) -> Result<i32, RunFailure> {
         let version = &self.toolchain.version;
         let mut init = strings(&[
             "init",
@@ -71,6 +78,7 @@ impl Backend for PythonBackend<'_> {
         args.extend(strings(&["--managed-python", "--python"]));
         args.push(version.clone());
         args.extend(strings(&["python", "main.py"]));
+        args.extend(arguments.iter().cloned());
         let result = run_final("uv", &args, Some(dir), &[], quiet)?;
         Ok(result.exit_code.unwrap_or(1))
     }

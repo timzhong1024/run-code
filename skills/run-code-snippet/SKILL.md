@@ -13,6 +13,14 @@ CODE
 LANG
 ```
 
+也可以读取已有代码片段文件，并在 `--` 后传入参数：
+
+```bash
+run-code TOOLCHAIN[@VERSION] [--package SPEC ...] [--commonjs] [--clean] [--quiet] FILE [-- ARG ...]
+```
+
+文件模式只读取 `FILE` 的内容，再将其复制进新建的隔离模板项目运行；不会在 `FILE` 所属的已有工程中执行，不会读取该工程的依赖，也不会复制相邻文件。缺少的依赖仍用 `--package` 明确添加。
+
 Fish 不支持 heredoc；用 `printf` 将每行代码送入 stdin：
 
 ```fish
@@ -30,11 +38,13 @@ CODE
 '@ | run-code TOOLCHAIN[@VERSION] [--package SPEC ...] [--commonjs] [--clean] [--quiet]
 ```
 
-使用 `python`、`node`、`rust`、`go` 或 `dotnet`；`javascript` 和 `typescript` 是 `node` 的别名，`csharp` 和 `cs` 是 `dotnet` 的别名。省略版本时使用内置的最新稳定版本。Python 依赖版本使用 `NAME==VERSION`；Rust 依赖可用 `NAME[@VERSION][FEATURE,...]` 指定 Cargo features；.NET 依赖使用 NuGet 的 `NAME[@VERSION]`。Node 默认以 ESM 统一运行 JavaScript/TypeScript，仅在代码明确依赖 CommonJS 时添加 `--commonjs`。C# 使用 .NET 10+ file-based app。Python 和 Node 未指定 `--package` 时直接执行且不创建项目；指定依赖时才创建隔离项目。需要项目时默认保留；仅在明确只需一次结果时添加 `--clean`，仅需代码本身的输出时添加 `--quiet`。直接调用工具，不自行创建项目或检查运行环境。
+使用 `python`、`node`、`rust`、`go` 或 `dotnet`；`javascript` 和 `typescript` 是 `node` 的别名，`csharp` 和 `cs` 是 `dotnet` 的别名。省略版本时使用内置的最新稳定版本。Python 依赖版本使用 `NAME==VERSION`；Rust 依赖可用 `NAME[@VERSION][FEATURE,...]` 指定 Cargo features；.NET 依赖使用 NuGet 的 `NAME[@VERSION]`。Node 默认以 ESM 统一运行 JavaScript/TypeScript，仅在代码明确依赖 CommonJS 时添加 `--commonjs`。C# 使用 .NET 10+ file-based app。stdin 模式下，Python 和 Node 未指定 `--package` 时直接执行；文件模式始终创建隔离模板项目。需要项目时默认保留；仅在明确只需一次结果时添加 `--clean`，仅需代码本身的输出时添加 `--quiet`。直接调用工具，不自行创建项目或检查运行环境。
 
 ## Examples
 
 ```bash
+run-code node@20 snippet.ts -- first --verbose
+
 run-code node@20 --package zod@4 --clean <<'TS'
 import { z } from "zod";
 console.log(z.object({ id: z.number() }).parse({ id: 1 }));

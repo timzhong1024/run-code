@@ -13,12 +13,23 @@ trait Backend {
     fn runs_without_project(&self) -> bool {
         false
     }
-    fn run_direct(&self, _code: &str, _quiet: bool) -> Result<i32, RunFailure> {
+    fn run_direct(
+        &self,
+        _code: &str,
+        _arguments: &[String],
+        _quiet: bool,
+    ) -> Result<i32, RunFailure> {
         Err(RunFailure::message(
             "this backend does not support direct execution",
         ))
     }
-    fn prepare(&self, project_dir: &Path, code: &str, quiet: bool) -> Result<i32, RunFailure>;
+    fn prepare(
+        &self,
+        project_dir: &Path,
+        code: &str,
+        arguments: &[String],
+        quiet: bool,
+    ) -> Result<i32, RunFailure>;
 }
 
 fn backend_for(cli: &Cli) -> Result<Box<dyn Backend + '_>, String> {
@@ -74,8 +85,12 @@ pub fn run_snippet(cli: &Cli, code: &str) -> Result<i32, RunError> {
         hint: None,
         exit_code: Some(2),
     })?;
-    if backend.runs_without_project() {
-        return backend.run_direct(code, cli.quiet).map_err(Into::into);
+    // File input is always copied into an isolated template project. It never
+    // runs in, or discovers dependencies from, the source file's project.
+    if should_run_direct(cli, backend.as_ref()) {
+        return backend
+            .run_direct(code, &cli.args, cli.quiet)
+            .map_err(Into::into);
     }
 
     let temp_dir = Builder::new()
@@ -93,8 +108,12 @@ pub fn run_snippet(cli: &Cli, code: &str) -> Result<i32, RunError> {
     };
 
     backend
-        .prepare(&project_dir, code, cli.quiet)
+        .prepare(&project_dir, code, &cli.args, cli.quiet)
         .map_err(Into::into)
+}
+
+fn should_run_direct(cli: &Cli, backend: &dyn Backend) -> bool {
+    cli.source.is_none() && backend.runs_without_project()
 }
 
 #[cfg(test)]
@@ -117,6 +136,19 @@ mod tests {
             let with_package =
                 Cli::try_parse_from(["run-code", toolchain, "--package", "example"]).unwrap();
             assert!(!backend_for(&with_package).unwrap().runs_without_project());
+        }
+    }
+
+    #[test]
+    fn source_files_force_an_isolated_template_project() {
+        for toolchain in ["python", "node"] {
+            let stdin = Cli::try_parse_from(["run-code", toolchain]).unwrap();
+            let stdin_backend = backend_for(&stdin).unwrap();
+            assert!(should_run_direct(&stdin, stdin_backend.as_ref()));
+
+            let cli = Cli::try_parse_from(["run-code", toolchain, "snippet.txt"]).unwrap();
+            let backend = backend_for(&cli).unwrap();
+            assert!(!should_run_direct(&cli, backend.as_ref()));
         }
     }
 }
