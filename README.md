@@ -15,7 +15,7 @@ brew install timzhong1024/tap/run-code
 You can also install the prebuilt binary through npm:
 
 ```bash
-npm install --global @timzhong/run-code
+npm install --global @timzhong2000/run-code
 ```
 
 Or install from source:

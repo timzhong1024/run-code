@@ -1,5 +1,5 @@
 {
-  "name": "@timzhong/run-code",
+  "name": "@timzhong2000/run-code",
   "version": "0.0.0-development",
   "description": "Run temporary Python, TypeScript, JavaScript, Rust, Go, or C# snippets with pinned toolchains and dependencies",
   "type": "module",

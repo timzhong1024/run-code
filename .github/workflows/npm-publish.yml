@@ -86,12 +86,19 @@ jobs:
         shell: bash
         working-directory: npm
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          BOOTSTRAP_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           name="$(node -p "require('./package.json').name")"
           version="$(node -p "require('./package.json').version")"
           if npm view "$name@$version" version >/dev/null 2>&1; then
             echo "$name@$version is already published"
           else
-            npm publish --access public --provenance
+            if [[ -n "$BOOTSTRAP_NPM_TOKEN" ]]; then
+              export NODE_AUTH_TOKEN="$BOOTSTRAP_NPM_TOKEN"
+              echo "Publishing with the bootstrap npm token"
+            else
+              unset NODE_AUTH_TOKEN
+              echo "Publishing with npm trusted publishing"
+            fi
+            npm publish --access public
           fi

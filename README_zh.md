@@ -15,7 +15,7 @@ brew install timzhong1024/tap/run-code
 也可以通过 npm 安装预编译 binary：
 
 ```bash
-npm install --global @timzhong/run-code
+npm install --global @timzhong2000/run-code
 ```
 
 或者从源码安装：
