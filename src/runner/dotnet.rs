@@ -1,7 +1,8 @@
 use super::Backend;
 use crate::cli::ToolchainSpec;
+use crate::execution::ExecutionContext;
 use crate::process::{RunFailure, run_final};
-use crate::util::{strings, write_source};
+use crate::util::{path_text, strings, write_source};
 use std::path::Path;
 
 pub struct DotnetBackend<'a> {
@@ -24,19 +25,33 @@ impl Backend for DotnetBackend<'_> {
         dir: &Path,
         code: &str,
         arguments: &[String],
+        execution: &ExecutionContext,
         quiet: bool,
     ) -> Result<i32, RunFailure> {
         let source = source_with_packages(code, self.packages)?;
-        write_source(&dir.join("snippet.cs"), &source)?;
+        let source_path = dir.join("snippet.cs");
+        write_source(&source_path, &source)?;
 
         let toolchain = format!("dotnet@{}", self.toolchain.version);
         let mut args = vec!["exec".into(), toolchain];
-        args.extend(strings(&["--", "dotnet", "run", "snippet.cs"]));
+        args.extend(strings(&["--", "dotnet", "run"]));
+        args.push(if execution.has_custom_cwd() {
+            path_text(&source_path)
+        } else {
+            "snippet.cs".into()
+        });
         if !arguments.is_empty() {
             args.push("--".into());
             args.extend(arguments.iter().cloned());
         }
-        let result = run_final("mise", &args, Some(dir), &[], quiet)?;
+        let result = run_final(
+            "mise",
+            &args,
+            Some(execution.cwd_or(dir)),
+            &[],
+            execution.environment(),
+            quiet,
+        )?;
         Ok(result.exit_code.unwrap_or(1))
     }
 }

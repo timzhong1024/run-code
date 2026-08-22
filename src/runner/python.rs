@@ -1,5 +1,6 @@
 use super::Backend;
 use crate::cli::ToolchainSpec;
+use crate::execution::ExecutionContext;
 use crate::process::{RunFailure, run_checked, run_checked_hidden, run_final};
 use crate::util::{path_text, strings, write_source};
 use std::path::Path;
@@ -22,15 +23,28 @@ impl Backend for PythonBackend<'_> {
         self.packages.is_empty()
     }
 
-    fn run_direct(&self, code: &str, arguments: &[String], quiet: bool) -> Result<i32, RunFailure> {
+    fn run_direct(
+        &self,
+        code: &str,
+        arguments: &[String],
+        execution: &ExecutionContext,
+        quiet: bool,
+    ) -> Result<i32, RunFailure> {
         let mut args = strings(&["run", "--quiet"]);
         args.extend(strings(&["--isolated", "--managed-python", "--python"]));
         args.push(self.toolchain.version.clone());
         args.extend(strings(&["python", "-c"]));
         args.push(code.into());
         args.extend(arguments.iter().cloned());
-        let cwd = std::env::temp_dir();
-        let result = run_final("uv", &args, Some(&cwd), &[], quiet)?;
+        let fallback = std::env::temp_dir();
+        let result = run_final(
+            "uv",
+            &args,
+            Some(execution.cwd_or(&fallback)),
+            &[],
+            execution.environment(),
+            quiet,
+        )?;
         Ok(result.exit_code.unwrap_or(1))
     }
 
@@ -39,6 +53,7 @@ impl Backend for PythonBackend<'_> {
         dir: &Path,
         code: &str,
         arguments: &[String],
+        execution: &ExecutionContext,
         quiet: bool,
     ) -> Result<i32, RunFailure> {
         let version = &self.toolchain.version;
@@ -75,11 +90,23 @@ impl Backend for PythonBackend<'_> {
         if quiet {
             args.push("--quiet".into());
         }
+        if execution.has_custom_cwd() {
+            args.extend(strings(&["--project"]));
+            args.push(path_text(dir));
+        }
         args.extend(strings(&["--managed-python", "--python"]));
         args.push(version.clone());
-        args.extend(strings(&["python", "main.py"]));
+        args.push("python".into());
+        args.push(path_text(&source));
         args.extend(arguments.iter().cloned());
-        let result = run_final("uv", &args, Some(dir), &[], quiet)?;
+        let result = run_final(
+            "uv",
+            &args,
+            Some(execution.cwd_or(dir)),
+            &[],
+            execution.environment(),
+            quiet,
+        )?;
         Ok(result.exit_code.unwrap_or(1))
     }
 }

@@ -1,5 +1,6 @@
 use super::Backend;
 use crate::cli::ToolchainSpec;
+use crate::execution::ExecutionContext;
 use crate::process::{RunFailure, run_checked, run_checked_hidden, run_final};
 use crate::util::{path_text, strings, write_source};
 use directories::ProjectDirs;
@@ -24,6 +25,7 @@ impl Backend for RustBackend<'_> {
         dir: &Path,
         code: &str,
         arguments: &[String],
+        execution: &ExecutionContext,
         quiet: bool,
     ) -> Result<i32, RunFailure> {
         let version = &self.toolchain.version;
@@ -67,11 +69,22 @@ impl Backend for RustBackend<'_> {
         let mut args = strings(&["run", "--install"]);
         args.push(version.clone());
         args.extend(strings(&["cargo", "run", "--quiet"]));
+        if execution.has_custom_cwd() {
+            args.extend(strings(&["--manifest-path"]));
+            args.push(path_text(&dir.join("Cargo.toml")));
+        }
         if !arguments.is_empty() {
             args.push("--".into());
             args.extend(arguments.iter().cloned());
         }
-        let result = run_final("rustup", &args, Some(dir), &env, quiet)?;
+        let result = run_final(
+            "rustup",
+            &args,
+            Some(execution.cwd_or(dir)),
+            &env,
+            execution.environment(),
+            quiet,
+        )?;
         Ok(result.exit_code.unwrap_or(1))
     }
 }

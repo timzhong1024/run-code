@@ -5,6 +5,7 @@ mod python;
 mod rust;
 
 use crate::cli::{Cli, ToolchainKind};
+use crate::execution::ExecutionContext;
 use crate::process::RunFailure;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, TempDir};
@@ -17,6 +18,7 @@ trait Backend {
         &self,
         _code: &str,
         _arguments: &[String],
+        _execution: &ExecutionContext,
         _quiet: bool,
     ) -> Result<i32, RunFailure> {
         Err(RunFailure::message(
@@ -28,6 +30,7 @@ trait Backend {
         project_dir: &Path,
         code: &str,
         arguments: &[String],
+        execution: &ExecutionContext,
         quiet: bool,
     ) -> Result<i32, RunFailure>;
 }
@@ -79,7 +82,7 @@ impl From<RunFailure> for RunError {
     }
 }
 
-pub fn run_snippet(cli: &Cli, code: &str) -> Result<i32, RunError> {
+pub fn run_snippet(cli: &Cli, execution: &ExecutionContext, code: &str) -> Result<i32, RunError> {
     let backend = backend_for(cli).map_err(|message| RunError {
         message,
         hint: None,
@@ -89,7 +92,7 @@ pub fn run_snippet(cli: &Cli, code: &str) -> Result<i32, RunError> {
     // runs in, or discovers dependencies from, the source file's project.
     if should_run_direct(cli, backend.as_ref()) {
         return backend
-            .run_direct(code, &cli.args, cli.quiet)
+            .run_direct(code, &cli.args, execution, cli.quiet)
             .map_err(Into::into);
     }
 
@@ -108,7 +111,7 @@ pub fn run_snippet(cli: &Cli, code: &str) -> Result<i32, RunError> {
     };
 
     backend
-        .prepare(&project_dir, code, &cli.args, cli.quiet)
+        .prepare(&project_dir, code, &cli.args, execution, cli.quiet)
         .map_err(Into::into)
 }
 

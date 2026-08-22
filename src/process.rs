@@ -77,12 +77,13 @@ pub fn run_final(
     args: &[String],
     cwd: Option<&Path>,
     env: &[(String, String)],
+    unprinted_env: &[(String, String)],
     quiet: bool,
 ) -> Result<ProcessResult, RunFailure> {
     if !quiet {
         eprintln!("+ {}", display_command(program, args, cwd, env));
     }
-    let status = command(program, args, cwd, env)
+    let status = command(program, args, cwd, env, unprinted_env)
         .status()
         .map_err(|error| RunFailure::start(program, error))?;
     Ok(ProcessResult {
@@ -100,7 +101,7 @@ fn run_setup(
 ) -> Result<ProcessResult, RunFailure> {
     if !quiet {
         eprintln!("+ {}", display_command(program, args, cwd, env));
-        let status = command(program, args, cwd, env)
+        let status = command(program, args, cwd, env, &[])
             .status()
             .map_err(|error| RunFailure::start(program, error))?;
         return Ok(ProcessResult {
@@ -109,7 +110,7 @@ fn run_setup(
         });
     }
 
-    let output = command(program, args, cwd, env)
+    let output = command(program, args, cwd, env, &[])
         .output()
         .map_err(|error| RunFailure::start(program, error))?;
     if !output.status.success() {
@@ -126,12 +127,18 @@ fn command(
     args: &[String],
     cwd: Option<&Path>,
     env: &[(String, String)],
+    unprinted_env: &[(String, String)],
 ) -> Command {
     let mut command = Command::new(program);
     command.args(args);
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
     }
+    for (key, value) in unprinted_env {
+        command.env(key, value);
+    }
+    // Explicit runner variables are applied last so isolation settings such as
+    // GOWORK=off cannot be replaced by an environment file.
     for (key, value) in env {
         command.env(key, value);
     }
@@ -199,11 +206,43 @@ mod tests {
 
     #[test]
     fn missing_program_is_reported_structurally() {
-        let error =
-            run_final("run-code-program-that-does-not-exist", &[], None, &[], true).unwrap_err();
+        let error = run_final(
+            "run-code-program-that-does-not-exist",
+            &[],
+            None,
+            &[],
+            &[],
+            true,
+        )
+        .unwrap_err();
         assert_eq!(
             error.missing_program.as_deref(),
             Some("run-code-program-that-does-not-exist")
+        );
+    }
+
+    #[test]
+    fn unprinted_environment_is_applied_but_not_displayed() {
+        let shown = display_command("tool", &[], None, &[]);
+        assert_eq!(shown, "tool");
+
+        let command = command(
+            "tool",
+            &[],
+            None,
+            &[("VISIBLE".into(), "runner".into())],
+            &[
+                ("SECRET".into(), "hidden".into()),
+                ("VISIBLE".into(), "file".into()),
+            ],
+        );
+        assert_eq!(command.get_envs().count(), 2);
+        assert_eq!(
+            command
+                .get_envs()
+                .find(|(key, _)| *key == "VISIBLE")
+                .and_then(|(_, value)| value),
+            Some(std::ffi::OsStr::new("runner"))
         );
     }
 }
