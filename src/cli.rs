@@ -54,13 +54,13 @@ impl FromStr for ToolchainSpec {
         };
         let kind = match name {
             "python" | "py" => ToolchainKind::Python,
-            "node" => ToolchainKind::Node,
+            "node" | "javascript" | "typescript" => ToolchainKind::Node,
             "rust" => ToolchainKind::Rust,
             "go" => ToolchainKind::Go,
             "dotnet" | "csharp" | "cs" => ToolchainKind::Dotnet,
             _ => {
                 return Err(format!(
-                    "unsupported toolchain {name:?}; expected python, node, rust, go, or dotnet"
+                    "unsupported toolchain {name:?}; expected python, node, javascript, typescript, rust, go, or dotnet"
                 ));
             }
         };
@@ -214,5 +214,13 @@ mod tests {
             "cs".parse::<ToolchainSpec>().unwrap().display(),
             "dotnet@10"
         );
+    }
+
+    #[test]
+    fn language_names_alias_to_node() {
+        for alias in ["javascript", "typescript"] {
+            let spec = format!("{alias}@20").parse::<ToolchainSpec>().unwrap();
+            assert_eq!(spec.display(), "node@20");
+        }
     }
 }

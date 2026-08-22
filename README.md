@@ -144,7 +144,7 @@ run-code [OPTIONS] TOOLCHAIN[@VERSION]
 run-code skill
 ```
 
-- `TOOLCHAIN[@VERSION]`: Select a language and optional version. Supported toolchains are `python`, `node`, `rust`, `go`, and `dotnet`; `csharp` and `cs` are aliases for `dotnet`.
+- `TOOLCHAIN[@VERSION]`: Select a language and optional version. Supported toolchains are `python`, `node`, `rust`, `go`, and `dotnet`; `javascript` and `typescript` are aliases for `node`, while `csharp` and `cs` are aliases for `dotnet`.
 - `-p, --package SPEC`: Add a temporary dependency. Repeat the option to install multiple packages. Specs follow each ecosystem: Python uses `NAME==VERSION`; Node, Rust, Go, and .NET use `NAME@VERSION`. Rust also supports `NAME[@VERSION][FEATURE,...]`, such as `'tokio@1[full]'`.
 - `--commonjs`: Run Node code as CommonJS. The default is ESM with top-level `await` support.
 - `--clean`: Delete the generated project after execution. Without this option, the project is retained and its path appears in the displayed command.
