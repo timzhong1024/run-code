@@ -2,68 +2,95 @@
 
 [简体中文](README_zh.md)
 
-Run Python, TypeScript, JavaScript, Rust, Go, or C# snippets from stdin or a source file with a selected runtime/toolchain version and temporary dependencies in an isolated environment.
+Run a disposable Python, TypeScript/JavaScript, Rust, Go, or C# snippet with a selected runtime version and temporary dependencies—without modifying your global environment or current project.
 
-## Installation
+```bash
+echo 'print("hello")' | run-code python@3.14
+```
 
-Homebrew is recommended on macOS:
+## Why run-code exists
+
+A small experiment should not require creating a project, choosing a package manager layout, switching the active runtime, installing dependencies, and deleting everything afterward. Installing a package globally or into the current project is faster initially, but leaves unrelated state behind.
+
+`run-code` turns the disposable case into one command:
+
+1. select a runtime or toolchain version;
+2. prepare dependencies in an isolated temporary environment;
+3. run code from stdin or a source file.
+
+Use it to try a package from its README, verify behavior on a specific runtime, reproduce a small example, or let an agent run a focused check. Use a normal project for multi-file programs, durable dependencies, or build configuration. `run-code` is isolation for convenience, not a security sandbox.
+
+## For agents
+
+After installing the binary, an agent can read its matching `run-code-snippet` skill and exact version-specific instructions by running:
+
+```bash
+run-code skill
+```
+
+Install the skill into a project when its use should be repository-specific:
+
+```bash
+mkdir -p .agents/skills/run-code-snippet
+run-code skill > .agents/skills/run-code-snippet/SKILL.md
+```
+
+Or install it globally for reuse across projects:
+
+```bash
+mkdir -p ~/.agents/skills/run-code-snippet
+run-code skill > ~/.agents/skills/run-code-snippet/SKILL.md
+```
+
+For a one-off check, the essential pattern is:
+
+```bash
+run-code TOOLCHAIN[@VERSION] [--package SPEC ...] [--clean] [--quiet] <<'LANG'
+CODE
+LANG
+```
+
+This gives the agent an explicit runtime, disposable dependencies, isolated project state, and normal stdout/stderr without asking it to scaffold a project manually.
+
+## Install
+
+On macOS:
 
 ```bash
 brew install timzhong1024/tap/run-code
 ```
 
-You can also install the prebuilt binary through npm:
+Other options:
 
 ```bash
 npm install --global @timzhong2000/run-code
-```
-
-Or install from source:
-
-```bash
 cargo install --locked --git https://github.com/timzhong1024/run-code
 ```
 
-GitHub Releases also provide standalone binaries for macOS, Linux, and Windows.
+Standalone macOS, Linux, and Windows binaries are available from [GitHub Releases](https://github.com/timzhong1024/run-code/releases).
 
-`run-code` delegates to external tools for each language. Install only the backends you use:
+`run-code` delegates runtime installation to existing tools. Install only the backends you use:
 
-| Language | Required tool |
-| --- | --- |
-| Python | [uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| TypeScript / JavaScript | [Vite+ (`vp`)](https://viteplus.dev/guide/) |
-| Rust | [rustup](https://rustup.rs/) |
-| Go | [mise](https://mise.jdx.dev/getting-started.html) |
-| C# / .NET | [mise](https://mise.jdx.dev/getting-started.html) |
+| Code | Toolchain argument | Required backend |
+| --- | --- | --- |
+| Python | `python[@VERSION]` | [uv](https://docs.astral.sh/uv/getting-started/installation/) |
+| TypeScript / JavaScript | `node[@VERSION]` | [Vite+ (`vp`)](https://viteplus.dev/guide/) |
+| Rust | `rust[@VERSION]` | [rustup](https://rustup.rs/) |
+| Go | `go[@VERSION]` | [mise](https://mise.jdx.dev/getting-started.html) |
+| C# | `dotnet[@VERSION]` | [mise](https://mise.jdx.dev/getting-started.html) |
 
-## Examples
+## Quick examples
 
-### Source file
-
-```bash
-run-code node@20 snippet.ts -- first --verbose
-```
-
-The source file is read and its contents are copied into a newly created isolated template project before execution. `run-code` does not execute inside the source file's existing project, discover that project's dependencies, or copy sibling files. Add everything the snippet needs with `--package`; arguments after `--` are passed to the snippet.
-
-### Working directory and environment
-
-```bash
-run-code node@20 --cwd ./fixtures --env-file ./snippet.env snippet.ts
-```
-
-`--cwd` changes the working directory seen by the final snippet process. Template initialization and dependency installation still happen inside the isolated temporary project. `--env-file` loads dotenv-compatible variables for the final launch and snippet process; it does not modify the current shell or earlier setup and dependency-installation steps, and loaded values are omitted from displayed commands. Both paths are resolved from the directory where `run-code` was invoked.
-
-### TypeScript
+### TypeScript with an npm package
 
 ```bash
 run-code node@20 --package zod@4 --clean <<'TS'
 import { z } from "zod";
-console.log(await Promise.resolve(z.string().parse("hello")));
+console.log(await Promise.resolve(z.object({ id: z.number() }).parse({ id: 1 })));
 TS
 ```
 
-### Python
+### Python with a PyPI package
 
 ```bash
 run-code python@3.14 --package requests==2.32.5 --clean <<'PY'
@@ -72,7 +99,7 @@ print(requests.__version__)
 PY
 ```
 
-### Rust
+### Rust with a crate
 
 ```bash
 run-code rust@stable --package serde_json@1 --clean <<'RS'
@@ -82,76 +109,26 @@ fn main() {
 RS
 ```
 
-### C#
+### Source files, arguments, working directory, and environment
 
 ```bash
-run-code dotnet@10 --package Spectre.Console@0.50.0 --clean <<'CS'
-using Spectre.Console;
-AnsiConsole.MarkupLine("[green]Hello from C#[/]");
-CS
+run-code node@20 \
+  --package zod@4 \
+  --cwd ./fixtures \
+  --env-file ./snippet.env \
+  snippet.ts -- first --verbose
 ```
 
-For asynchronous Rust, specify Cargo features in the dependency spec:
+The file is copied into a fresh isolated template; its existing project, dependencies, and sibling files are not used. Arguments after `--` go to the snippet. `--cwd` affects only the final code process, while `--env-file` supplies dotenv-compatible variables without changing the current shell or exposing their values in the displayed command.
 
-```bash
-run-code rust@stable --package 'tokio@1[full]' --clean <<'RS'
-#[tokio::main]
-async fn main() {
-    println!("async");
-}
-RS
-```
+## Execution behavior
 
-In Windows PowerShell 7, use a single-quoted here-string:
-
-```powershell
-@'
-print("hello\nworld")
-'@ | run-code python@3.14 --clean
-```
-
-Fish does not support heredocs, so use `printf`:
-
-```fish
-printf '%s\n' \
-    'const value: string = await Promise.resolve("hello");' \
-    'console.log(value);' |
-    run-code node@20
-```
-
-## Agent Skill
-
-`run-code skill` prints the complete bundled `SKILL.md` from the installed binary. An agent can discover the skill by its name and description, then read the full instructions when the task matches.
-
-Install it in the current project:
-
-```bash
-mkdir -p .agents/skills/run-code-snippet
-run-code skill > .agents/skills/run-code-snippet/SKILL.md
-```
-
-Or install it in your user directory to make it available across projects:
-
-```bash
-mkdir -p ~/.agents/skills/run-code-snippet
-run-code skill > ~/.agents/skills/run-code-snippet/SKILL.md
-```
-
-Codex automatically discovers skills in these directories. See the [Codex Skills documentation](https://learn.chatgpt.com/docs/build-skills) for details.
-
-## Why this project exists
-
-Running a temporary snippet often means paying the setup cost of creating a project, installing dependencies, and preparing an environment. Switching to a different runtime or toolchain version for one task is also cumbersome, while installing packages globally or into an existing project creates unwanted state.
-
-Several related tools solve parts of this problem, but none matched the combination of temporary dependencies, version switching, and isolated execution needed here. Inspired by snippet runners, version managers, and temporary package executors, `run-code` combines those steps into one command.
-
-## Security
-
-`run-code` provides environment and dependency isolation; it is not a security sandbox. Snippets and third-party dependencies run with the current user's permissions and may access local files, the network, environment variables, and credentials. Variables loaded with `--env-file` are deliberately available to the snippet, so do not pass secrets to untrusted code.
-
-Dependency installation may execute npm lifecycle scripts, Python build backends, Cargo `build.rs` scripts, or other ecosystem-specific build code. Run only trusted code and dependencies. Inspect unfamiliar packages before use, pin versions in sensitive environments, and avoid exposing unnecessary secrets. `--clean` removes only the temporary project; it cannot undo system or network side effects, and package-manager download caches remain in place.
-
-Report vulnerabilities privately through GitHub private vulnerability reporting. See [SECURITY.md](SECURITY.md) for scope and reporting instructions.
+- Omitting a version selects the built-in stable policy: Python 3.14, Node latest, Rust stable, Go latest, and .NET 10.
+- Python and Node stdin snippets without `--package` run directly; dependencies or file input use an isolated template project.
+- Temporary projects are retained by default so their generated command paths remain inspectable. Add `--clean` for a one-off run.
+- Package-manager download caches remain enabled, so isolation does not mean downloading every package again.
+- By default, dependency installation and the final command are displayed and their output is streamed. `--quiet` leaves only the final process stdout/stderr.
+- Node defaults to ESM with TypeScript and top-level `await` support. Use `--commonjs` only for CommonJS-specific code.
 
 ## CLI reference
 
@@ -161,17 +138,42 @@ run-code [OPTIONS] TOOLCHAIN[@VERSION] FILE [-- ARG ...]
 run-code skill
 ```
 
-- `TOOLCHAIN[@VERSION]`: Select a language and optional version. Supported toolchains are `python`, `node`, `rust`, `go`, and `dotnet`; `javascript` and `typescript` are aliases for `node`, while `csharp` and `cs` are aliases for `dotnet`.
-- `FILE`: Read a source file and copy its contents into a new isolated template project. The file's existing project and sibling files are not used. When omitted, source code is read from stdin.
-- `ARG`: Pass arguments after `--` to the snippet process. This also works with stdin input.
-- `-p, --package SPEC`: Add a temporary dependency. Repeat the option to install multiple packages. Specs follow each ecosystem: Python uses `NAME==VERSION`; Node, Rust, Go, and .NET use `NAME@VERSION`. Rust also supports `NAME[@VERSION][FEATURE,...]`, such as `'tokio@1[full]'`.
-- `--cwd DIR`: Set the final snippet process's working directory. Template setup and dependency installation remain isolated from this directory.
-- `--env-file FILE`: Load dotenv-compatible variables for the final launch and snippet process. Values override inherited variables with the same name and are not printed in displayed commands; runner-owned isolation variables take precedence.
-- `--commonjs`: Run Node code as CommonJS. The default is ESM with top-level `await` support.
-- `--clean`: Delete the generated project after execution. Without this option, the project is retained and its path appears in the displayed command.
-- `--quiet`: Hide project setup, dependency installation, and command display; print only stdout/stderr from the final code process.
-- `skill`: Print the bundled `run-code-snippet` skill.
-- `-h, --help`: Show help.
-- `-V, --version`: Show the version.
+| Argument | Meaning |
+| --- | --- |
+| `TOOLCHAIN[@VERSION]` | `python`, `node`, `rust`, `go`, or `dotnet`; `javascript`/`typescript` alias `node`, and `csharp`/`cs` alias `dotnet` |
+| `FILE` | Copy and run one source file instead of reading stdin |
+| `-- ARG ...` | Pass trailing arguments to the snippet |
+| `-p, --package SPEC` | Add a dependency; repeat for multiple packages |
+| `--cwd DIR` | Set the final snippet process working directory |
+| `--env-file FILE` | Load dotenv variables for the final process |
+| `--commonjs` | Run Node code as CommonJS instead of ESM |
+| `--clean` | Remove the temporary project after execution |
+| `--quiet` | Show only final-process stdout/stderr |
+| `skill` | Print the bundled agent skill |
 
-When the version is omitted, built-in defaults are used: Python 3.14, Node latest, Rust stable, Go latest, and .NET 10. C# runs as a .NET 10+ file-based app. For stdin input, Python and Node execute directly when no `--package` option is provided. File input always creates an isolated template project, even without dependencies. Package-manager download caches remain enabled. By default, `run-code` displays only dependency installation and final execution commands while streaming their stdout/stderr; project initialization output is shown only when initialization fails.
+Package specs follow their ecosystems. Python accepts `NAME==VERSION`; Node, Rust, Go, and .NET accept `NAME@VERSION`. Rust features use `NAME[@VERSION][FEATURE,...]`, for example `'tokio@1[full]'`.
+
+### Shell input
+
+Bash and Zsh use the quoted heredocs shown above. Fish can pipe `printf`:
+
+```fish
+printf '%s\n' \
+    'const value: string = await Promise.resolve("hello");' \
+    'console.log(value);' |
+    run-code node@20
+```
+
+PowerShell 7 can pipe a single-quoted here-string:
+
+```powershell
+@'
+print("hello\nworld")
+'@ | run-code python@3.14 --clean
+```
+
+## Security
+
+Snippets, dependencies, package lifecycle hooks, Python build backends, and Cargo build scripts run with the current user's permissions. They may access files, the network, environment variables, credentials, and other processes. Run only trusted code and packages; pin versions when reproducibility matters and do not pass secrets to untrusted snippets.
+
+`--clean` removes the temporary project, but cannot undo filesystem or network side effects. See [SECURITY.md](SECURITY.md) for the reporting policy and complete security boundary.

@@ -2,68 +2,95 @@
 
 [English](README.md)
 
-在隔离的临时环境中，用指定版本的 runtime/toolchain 和依赖快速运行来自 stdin 或源文件的一段 Python、TypeScript、JavaScript、Rust、Go 或 C# 代码。
+使用指定版本的 runtime/toolchain 和临时依赖，运行一段一次性的 Python、TypeScript/JavaScript、Rust、Go 或 C# 代码，同时不修改全局环境或当前项目。
+
+```bash
+echo 'print("hello")' | run-code python@3.14
+```
+
+## 为什么需要 run-code
+
+一个小实验不应该要求你创建项目、选择包管理布局、切换当前 runtime、安装依赖，最后再删除所有文件。把包直接安装到全局或当前项目虽然开始得快，却会留下与项目无关的状态。
+
+`run-code` 把一次性运行收敛为一个命令：
+
+1. 选择 runtime 或 toolchain 版本；
+2. 在隔离的临时环境中准备依赖；
+3. 运行来自 stdin 或源文件的代码。
+
+它适合试用 README 里看到的包、验证特定 runtime 的行为、复现小型示例，或者让 Agent 做一次聚焦检查。多文件程序、长期依赖和正式构建配置仍应使用普通项目。`run-code` 提供的是便利性的隔离，不是安全沙箱。
+
+## 给 Agent 使用
+
+安装 binary 后，Agent 可以用下面的命令读取内置的 `run-code-snippet` skill，以及与当前版本准确匹配的说明：
+
+```bash
+run-code skill
+```
+
+如果只希望当前项目使用，将 skill 安装到项目：
+
+```bash
+mkdir -p .agents/skills/run-code-snippet
+run-code skill > .agents/skills/run-code-snippet/SKILL.md
+```
+
+需要跨项目复用时，安装到全局：
+
+```bash
+mkdir -p ~/.agents/skills/run-code-snippet
+run-code skill > ~/.agents/skills/run-code-snippet/SKILL.md
+```
+
+一次性检查的核心调用方式是：
+
+```bash
+run-code TOOLCHAIN[@VERSION] [--package SPEC ...] [--clean] [--quiet] <<'LANG'
+CODE
+LANG
+```
+
+这样 Agent 可以明确指定 runtime、使用一次性依赖和隔离项目状态，并获得正常的 stdout/stderr，无需自行初始化项目。
 
 ## 安装
 
-macOS 推荐使用 Homebrew：
+macOS：
 
 ```bash
 brew install timzhong1024/tap/run-code
 ```
 
-也可以通过 npm 安装预编译 binary：
+其他安装方式：
 
 ```bash
 npm install --global @timzhong2000/run-code
-```
-
-或者从源码安装：
-
-```bash
 cargo install --locked --git https://github.com/timzhong1024/run-code
 ```
 
-GitHub Release 还会提供 macOS、Linux 和 Windows 的独立 binary。
+[GitHub Releases](https://github.com/timzhong1024/run-code/releases) 还提供 macOS、Linux 和 Windows 的独立 binary。
 
-`run-code` 按语言调用外部工具；只需安装自己会使用的后端：
+`run-code` 把 runtime 安装交给现有工具；只需安装会用到的后端：
 
-| 语言 | 必需工具 |
-| --- | --- |
-| Python | [uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| TypeScript / JavaScript | [Vite+ (`vp`)](https://viteplus.dev/guide/) |
-| Rust | [rustup](https://rustup.rs/) |
-| Go | [mise](https://mise.jdx.dev/getting-started.html) |
-| C# / .NET | [mise](https://mise.jdx.dev/getting-started.html) |
+| 代码 | Toolchain 参数 | 必需后端 |
+| --- | --- | --- |
+| Python | `python[@VERSION]` | [uv](https://docs.astral.sh/uv/getting-started/installation/) |
+| TypeScript / JavaScript | `node[@VERSION]` | [Vite+ (`vp`)](https://viteplus.dev/guide/) |
+| Rust | `rust[@VERSION]` | [rustup](https://rustup.rs/) |
+| Go | `go[@VERSION]` | [mise](https://mise.jdx.dev/getting-started.html) |
+| C# | `dotnet[@VERSION]` | [mise](https://mise.jdx.dev/getting-started.html) |
 
-## 示例
+## 快速示例
 
-### 源文件
-
-```bash
-run-code node@20 snippet.ts -- first --verbose
-```
-
-执行前，`run-code` 会读取源文件，并将内容复制到新建的隔离模板项目中。它不会在源文件所属的已有工程里运行，不会读取该工程的依赖，也不会复制同目录的其他文件。代码片段需要的依赖应通过 `--package` 明确添加；`--` 后的参数会传给代码进程。
-
-### 工作目录与环境变量
-
-```bash
-run-code node@20 --cwd ./fixtures --env-file ./snippet.env snippet.ts
-```
-
-`--cwd` 设置最终代码进程看到的工作目录；模板初始化和依赖安装仍然在隔离的临时项目中完成。`--env-file` 按 dotenv 语法为最终启动命令和代码进程加载变量，不修改当前 shell，也不会用于之前的初始化及依赖安装步骤；加载的值不会显示在输出的命令中。两个路径都基于调用 `run-code` 时所在的目录解析。
-
-### TypeScript
+### 使用 npm 包的 TypeScript
 
 ```bash
 run-code node@20 --package zod@4 --clean <<'TS'
 import { z } from "zod";
-console.log(await Promise.resolve(z.string().parse("hello")));
+console.log(await Promise.resolve(z.object({ id: z.number() }).parse({ id: 1 })));
 TS
 ```
 
-### Python
+### 使用 PyPI 包的 Python
 
 ```bash
 run-code python@3.14 --package requests==2.32.5 --clean <<'PY'
@@ -72,7 +99,7 @@ print(requests.__version__)
 PY
 ```
 
-### Rust
+### 使用 crate 的 Rust
 
 ```bash
 run-code rust@stable --package serde_json@1 --clean <<'RS'
@@ -82,76 +109,26 @@ fn main() {
 RS
 ```
 
-### C#
+### 源文件、参数、工作目录与环境变量
 
 ```bash
-run-code dotnet@10 --package Spectre.Console@0.50.0 --clean <<'CS'
-using Spectre.Console;
-AnsiConsole.MarkupLine("[green]Hello from C#[/]");
-CS
+run-code node@20 \
+  --package zod@4 \
+  --cwd ./fixtures \
+  --env-file ./snippet.env \
+  snippet.ts -- first --verbose
 ```
 
-异步 Rust 可以为依赖指定 Cargo features：
+源文件会被复制到全新的隔离模板中；它原有的项目、依赖和同目录文件都不会被使用。`--` 后的参数会传给代码进程。`--cwd` 只影响最终代码进程，`--env-file` 则提供 dotenv 变量，不修改当前 shell，也不会在展示的命令中暴露变量值。
 
-```bash
-run-code rust@stable --package 'tokio@1[full]' --clean <<'RS'
-#[tokio::main]
-async fn main() {
-    println!("async");
-}
-RS
-```
+## 执行行为
 
-Windows PowerShell 7 使用单引号 here-string：
-
-```powershell
-@'
-print("hello\nworld")
-'@ | run-code python@3.14 --clean
-```
-
-Fish 不支持 heredoc，使用 `printf`：
-
-```fish
-printf '%s\n' \
-    'const value: string = await Promise.resolve("hello");' \
-    'console.log(value);' |
-    run-code node@20
-```
-
-## Agent Skill
-
-`run-code skill` 从已安装的二进制中输出完整 `SKILL.md`。Agent 会先读取 skill 的名称和 description，在匹配任务后再读取完整内容。
-
-推荐安装到当前项目：
-
-```bash
-mkdir -p .agents/skills/run-code-snippet
-run-code skill > .agents/skills/run-code-snippet/SKILL.md
-```
-
-需要在所有项目中使用时，安装到用户目录：
-
-```bash
-mkdir -p ~/.agents/skills/run-code-snippet
-run-code skill > ~/.agents/skills/run-code-snippet/SKILL.md
-```
-
-Codex 会自动发现这些目录中的 skill；详细约定见 [Codex Skills 文档](https://learn.chatgpt.com/docs/build-skills)。
-
-## 为什么做这个项目
-
-临时运行代码时，初始化项目、安装依赖和准备运行环境的成本很高；临时切换 runtime 或 toolchain 版本也很麻烦。直接安装依赖又容易污染全局环境或当前项目环境。
-
-已经有一些相似工具，但没有同时满足临时依赖、版本切换和隔离运行这些需求。`run-code` 受到这些代码片段运行器、版本管理器和临时包执行工具的启发，把这几个步骤统一成一个命令。
-
-## 安全
-
-`run-code` 提供的是环境和依赖隔离，不是安全沙箱。输入的代码和第三方依赖都以当前用户权限运行，可以访问本机文件、网络、环境变量和凭据。`--env-file` 加载的变量会明确提供给代码片段，不要把密钥传给不可信代码。
-
-依赖安装还可能执行 npm lifecycle scripts、Python build backend、Cargo `build.rs` 或其他生态的构建代码。只运行可信代码和依赖；使用陌生包前先检查官方文档与源码，敏感环境中固定版本，并避免暴露不必要的密钥。`--clean` 只删除临时项目，不会撤销代码已经产生的系统或网络副作用；各包管理器的下载缓存会继续保留。
-
-漏洞请通过 GitHub private vulnerability reporting 私下提交；范围和报告方式见 [SECURITY.md](SECURITY.md)。
+- 省略版本时使用内置的稳定策略：Python 3.14、Node latest、Rust stable、Go latest、.NET 10。
+- Python 和 Node 从 stdin 读取且没有 `--package` 时直接运行；有依赖或使用源文件时会创建隔离模板项目。
+- 临时项目默认保留，方便检查输出命令中的生成路径；只运行一次时添加 `--clean`。
+- 包管理器下载缓存保持启用，因此隔离运行不等于每次重新下载所有依赖。
+- 默认展示依赖安装和最终运行命令，并透传输出；`--quiet` 只保留最终进程的 stdout/stderr。
+- Node 默认使用支持 TypeScript 和顶层 `await` 的 ESM；只有明确依赖 CommonJS 时才使用 `--commonjs`。
 
 ## 参数
 
@@ -161,17 +138,42 @@ run-code [OPTIONS] TOOLCHAIN[@VERSION] FILE [-- ARG ...]
 run-code skill
 ```
 
-- `TOOLCHAIN[@VERSION]`：选择语言及版本。支持 `python`、`node`、`rust`、`go` 和 `dotnet`；`javascript`、`typescript` 是 `node` 的别名，`csharp`、`cs` 是 `dotnet` 的别名，版本可以省略。
-- `FILE`：读取源文件，并将内容复制进新的隔离模板项目；不会使用文件所在的已有工程或同目录文件。省略时从 stdin 读取代码。
-- `ARG`：在 `--` 后提供并传给代码进程；stdin 输入同样可以传参。
-- `-p, --package SPEC`：添加临时依赖，可重复使用以安装多个包。依赖格式遵循对应生态；Python 版本使用 `NAME==VERSION`，Node、Rust、Go 和 .NET 使用 `NAME@VERSION`。Rust 还支持 `NAME[@VERSION][FEATURE,...]`，例如 `'tokio@1[full]'`。
-- `--cwd DIR`：设置最终代码进程的工作目录；模板初始化和依赖安装仍与该目录隔离。
-- `--env-file FILE`：按 dotenv 语法为最终启动命令和代码进程加载变量；同名变量会覆盖继承的环境变量，值不会显示在输出命令中，但 runner 自身用于隔离的变量优先。
-- `--commonjs`：让 Node 以 CommonJS 方式运行；默认使用支持顶层 `await` 的 ESM。
-- `--clean`：运行结束后删除临时项目；不指定时保留项目，默认输出的执行命令中会包含项目路径。
-- `--quiet`：隐藏项目初始化、依赖安装及命令本身，只输出最终代码进程的 stdout/stderr。
-- `skill`：输出内置的 `run-code-snippet` Skill 内容。
-- `-h, --help`：显示帮助。
-- `-V, --version`：显示版本。
+| 参数 | 含义 |
+| --- | --- |
+| `TOOLCHAIN[@VERSION]` | `python`、`node`、`rust`、`go` 或 `dotnet`；`javascript`/`typescript` 是 `node` 别名，`csharp`/`cs` 是 `dotnet` 别名 |
+| `FILE` | 不读取 stdin，改为复制并运行一个源文件 |
+| `-- ARG ...` | 向代码进程传递参数 |
+| `-p, --package SPEC` | 添加依赖；多个依赖可重复使用 |
+| `--cwd DIR` | 设置最终代码进程的工作目录 |
+| `--env-file FILE` | 为最终进程加载 dotenv 变量 |
+| `--commonjs` | 让 Node 使用 CommonJS 而不是 ESM |
+| `--clean` | 执行后删除临时项目 |
+| `--quiet` | 只显示最终进程 stdout/stderr |
+| `skill` | 输出内置的 Agent skill |
 
-未指定版本时使用内置默认值：Python 3.14、Node latest、Rust stable、Go latest、.NET 10。C# 通过 .NET 10+ file-based app 运行。使用 stdin 且未指定 `--package` 时，Python 和 Node 直接执行；使用文件输入时，即使没有依赖也始终创建隔离模板项目。包管理器的下载缓存保持启用。默认只显示依赖安装和最终代码运行命令，并实时透传它们的 stdout/stderr；项目初始化仅在失败时输出诊断信息。
+依赖格式遵循各自生态。Python 使用 `NAME==VERSION`；Node、Rust、Go 和 .NET 使用 `NAME@VERSION`。Rust features 使用 `NAME[@VERSION][FEATURE,...]`，例如 `'tokio@1[full]'`。
+
+### Shell 输入
+
+Bash 和 Zsh 使用上面展示的 quoted heredoc。Fish 可以使用 `printf`：
+
+```fish
+printf '%s\n' \
+    'const value: string = await Promise.resolve("hello");' \
+    'console.log(value);' |
+    run-code node@20
+```
+
+PowerShell 7 可以使用单引号 here-string：
+
+```powershell
+@'
+print("hello\nworld")
+'@ | run-code python@3.14 --clean
+```
+
+## 安全
+
+代码片段、依赖、包 lifecycle hook、Python build backend 和 Cargo build script 都以当前用户权限运行，可以访问文件、网络、环境变量、凭据和其他进程。只运行可信代码和依赖；需要可复现时固定版本，不要把密钥传给不可信代码。
+
+`--clean` 只能删除临时项目，不能撤销文件系统或网络副作用。完整安全边界和漏洞报告方式见 [SECURITY.md](SECURITY.md)。
