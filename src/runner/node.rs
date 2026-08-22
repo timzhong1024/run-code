@@ -1,14 +1,19 @@
 use super::Backend;
 use crate::cli::ToolchainSpec;
 use crate::execution::ExecutionContext;
-use crate::process::{RunFailure, run_checked, run_checked_hidden, run_final};
+use crate::process::{RunFailure, run_checked, run_final};
 use crate::util::{path_text, strings, write_source};
-use serde_json::json;
 use std::fs;
 use std::path::Path;
 use tempfile::Builder;
 
 const TSX_VERSION: &str = "4.23.12";
+const PACKAGE_JSON: &str = r#"{
+  "name": "run-code-snippet",
+  "private": true,
+  "type": "module"
+}
+"#;
 
 pub struct NodeBackend<'a> {
     toolchain: &'a ToolchainSpec,
@@ -88,34 +93,12 @@ impl Backend for NodeBackend<'_> {
         quiet: bool,
     ) -> Result<i32, RunFailure> {
         let file = self.file_name();
-        let manifest = serde_json::to_string_pretty(&json!({
-            "name": "run-code-snippet",
-            "private": true,
-            "type": "module",
-            "scripts": { "start": format!("tsx {file}") }
-        }))
-        .map_err(|e| RunFailure::message(format!("failed to build package.json: {e}")))?;
-        fs::write(dir.join("package.json"), format!("{manifest}\n"))
+        fs::write(dir.join("package.json"), PACKAGE_JSON)
             .map_err(|e| RunFailure::message(format!("failed to write package.json: {e}")))?;
         let source = dir.join(file);
         write_source(&source, code)?;
 
         let version = &self.toolchain.version;
-        run_checked_hidden(
-            "pin Node.js toolchain",
-            "vp",
-            &[
-                "env".into(),
-                "pin".into(),
-                version.clone(),
-                "--target".into(),
-                "node-version".into(),
-                "--force".into(),
-            ],
-            Some(dir),
-            &[],
-        )?;
-
         let mut install = vec![
             "env".into(),
             "exec".into(),
@@ -136,11 +119,7 @@ impl Backend for NodeBackend<'_> {
             quiet,
         )?;
 
-        let final_args = if execution.has_custom_cwd() {
-            final_command_from(dir, &source, version, arguments)
-        } else {
-            final_command(file, arguments, quiet)
-        };
+        let final_args = final_command(dir, &source, version, arguments);
         let result = run_final(
             "vp",
             &final_args,
@@ -153,7 +132,7 @@ impl Backend for NodeBackend<'_> {
     }
 }
 
-fn final_command_from(
+fn final_command(
     project_dir: &Path,
     source: &Path,
     version: &str,
@@ -169,38 +148,15 @@ fn final_command_from(
     command
 }
 
-fn final_command(file: &str, arguments: &[String], quiet: bool) -> Vec<String> {
-    let mut command = if quiet {
-        strings(&["exec", "--", "tsx", file])
-    } else {
-        strings(&["run", "start"])
-    };
-    command.extend(arguments.iter().cloned());
-    command
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn snippet_arguments_do_not_include_the_cli_separator() {
-        let arguments = vec!["first".into(), "--flag".into()];
-        assert_eq!(
-            final_command("snippet.ts", &arguments, false),
-            ["run", "start", "first", "--flag"]
-        );
-        assert_eq!(
-            final_command("snippet.ts", &arguments, true),
-            ["exec", "--", "tsx", "snippet.ts", "first", "--flag"]
-        );
-    }
-
-    #[test]
-    fn custom_cwd_command_uses_absolute_project_tools_and_source() {
+    fn project_command_uses_explicit_toolchain_and_absolute_paths() {
         let project = Path::new("template");
         let source = project.join("snippet.ts");
-        let command = final_command_from(project, &source, "20", &["first".into()]);
+        let command = final_command(project, &source, "20", &["first".into(), "--flag".into()]);
         assert_eq!(&command[..5], ["env", "exec", "--node", "20", "node"]);
         assert_eq!(
             command[5],
@@ -208,5 +164,6 @@ mod tests {
         );
         assert_eq!(command[6], path_text(&source));
         assert_eq!(command[7], "first");
+        assert_eq!(command[8], "--flag");
     }
 }

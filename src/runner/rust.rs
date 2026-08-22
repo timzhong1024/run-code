@@ -69,10 +69,8 @@ impl Backend for RustBackend<'_> {
         let mut args = strings(&["run", "--install"]);
         args.push(version.clone());
         args.extend(strings(&["cargo", "run", "--quiet"]));
-        if execution.has_custom_cwd() {
-            args.extend(strings(&["--manifest-path"]));
-            args.push(path_text(&dir.join("Cargo.toml")));
-        }
+        args.extend(strings(&["--manifest-path"]));
+        args.push(path_text(&dir.join("Cargo.toml")));
         if !arguments.is_empty() {
             args.push("--".into());
             args.extend(arguments.iter().cloned());

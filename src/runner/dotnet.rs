@@ -35,11 +35,7 @@ impl Backend for DotnetBackend<'_> {
         let toolchain = format!("dotnet@{}", self.toolchain.version);
         let mut args = vec!["exec".into(), toolchain];
         args.extend(strings(&["--", "dotnet", "run"]));
-        args.push(if execution.has_custom_cwd() {
-            path_text(&source_path)
-        } else {
-            "snippet.cs".into()
-        });
+        args.push(path_text(&source_path));
         if !arguments.is_empty() {
             args.push("--".into());
             args.extend(arguments.iter().cloned());

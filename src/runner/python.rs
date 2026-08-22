@@ -90,10 +90,8 @@ impl Backend for PythonBackend<'_> {
         if quiet {
             args.push("--quiet".into());
         }
-        if execution.has_custom_cwd() {
-            args.extend(strings(&["--project"]));
-            args.push(path_text(dir));
-        }
+        args.extend(strings(&["--project"]));
+        args.push(path_text(dir));
         args.extend(strings(&["--managed-python", "--python"]));
         args.push(version.clone());
         args.push("python".into());
