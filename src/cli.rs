@@ -19,27 +19,10 @@ pub enum ToolchainKind {
     Dotnet,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ToolchainSpec {
     pub kind: ToolchainKind,
     pub version: String,
-}
-
-#[cfg(test)]
-impl ToolchainSpec {
-    pub fn name(&self) -> &'static str {
-        match self.kind {
-            ToolchainKind::Python => "python",
-            ToolchainKind::Node => "node",
-            ToolchainKind::Rust => "rust",
-            ToolchainKind::Go => "go",
-            ToolchainKind::Dotnet => "dotnet",
-        }
-    }
-
-    pub fn display(&self) -> String {
-        format!("{}@{}", self.name(), self.version)
-    }
 }
 
 impl FromStr for ToolchainSpec {
@@ -79,7 +62,7 @@ impl FromStr for ToolchainSpec {
     }
 }
 
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[command(
     name = "run-code",
     version,
@@ -126,7 +109,7 @@ pub struct Cli {
     pub quiet: bool,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum Command {
     /// Print the installable Codex skill to stdout
     Skill,
@@ -157,6 +140,8 @@ impl Cli {
             }
         } else if self.toolchain.is_none() {
             Some("missing required TOOLCHAIN[@VERSION] or the skill command".into())
+        } else if self.commonjs && self.toolchain().kind != ToolchainKind::Node {
+            Some("--commonjs is only valid with the node toolchain".into())
         } else {
             None
         }
@@ -166,6 +151,12 @@ impl Cli {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_toolchain(input: &str, kind: ToolchainKind, version: &str) {
+        let spec = input.parse::<ToolchainSpec>().unwrap();
+        assert_eq!(spec.kind, kind);
+        assert_eq!(spec.version, version);
+    }
 
     #[test]
     fn cli_surface_stays_small() {
@@ -180,7 +171,8 @@ mod tests {
     #[test]
     fn positional_toolchain_accepts_a_version() {
         let cli = Cli::try_parse_from(["run-code", "node@20", "--commonjs"]).unwrap();
-        assert_eq!(cli.toolchain().display(), "node@20");
+        assert_eq!(cli.toolchain().kind, ToolchainKind::Node);
+        assert_eq!(cli.toolchain().version, "20");
         assert!(cli.commonjs);
     }
 
@@ -234,45 +226,29 @@ mod tests {
 
     #[test]
     fn omitted_versions_use_stable_policy() {
-        assert_eq!(
-            "python".parse::<ToolchainSpec>().unwrap().display(),
-            "python@3.14"
-        );
-        assert_eq!(
-            "node".parse::<ToolchainSpec>().unwrap().display(),
-            "node@latest"
-        );
-        assert_eq!(
-            "rust".parse::<ToolchainSpec>().unwrap().display(),
-            "rust@stable"
-        );
-        assert_eq!(
-            "go".parse::<ToolchainSpec>().unwrap().display(),
-            "go@latest"
-        );
-        assert_eq!(
-            "dotnet".parse::<ToolchainSpec>().unwrap().display(),
-            "dotnet@10"
-        );
+        assert_toolchain("python", ToolchainKind::Python, "3.14");
+        assert_toolchain("node", ToolchainKind::Node, "latest");
+        assert_toolchain("rust", ToolchainKind::Rust, "stable");
+        assert_toolchain("go", ToolchainKind::Go, "latest");
+        assert_toolchain("dotnet", ToolchainKind::Dotnet, "10");
     }
 
     #[test]
     fn csharp_aliases_select_dotnet() {
-        assert_eq!(
-            "csharp@10".parse::<ToolchainSpec>().unwrap().display(),
-            "dotnet@10"
-        );
-        assert_eq!(
-            "cs".parse::<ToolchainSpec>().unwrap().display(),
-            "dotnet@10"
-        );
+        assert_toolchain("csharp@10", ToolchainKind::Dotnet, "10");
+        assert_toolchain("cs", ToolchainKind::Dotnet, "10");
     }
 
     #[test]
     fn language_names_alias_to_node() {
         for alias in ["javascript", "typescript"] {
-            let spec = format!("{alias}@20").parse::<ToolchainSpec>().unwrap();
-            assert_eq!(spec.display(), "node@20");
+            assert_toolchain(&format!("{alias}@20"), ToolchainKind::Node, "20");
         }
+    }
+
+    #[test]
+    fn commonjs_is_node_only() {
+        let cli = Cli::try_parse_from(["run-code", "python", "--commonjs"]).unwrap();
+        assert!(cli.validation_error().is_some());
     }
 }

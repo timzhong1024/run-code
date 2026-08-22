@@ -15,19 +15,12 @@ const PACKAGE_JSON: &str = r#"{
 }
 "#;
 
-pub struct NodeBackend<'a> {
-    toolchain: &'a ToolchainSpec,
-    packages: &'a [String],
-    commonjs: bool,
+pub(super) struct NodeBackend<'a> {
+    pub(super) toolchain: &'a ToolchainSpec,
+    pub(super) packages: &'a [String],
+    pub(super) commonjs: bool,
 }
-impl<'a> NodeBackend<'a> {
-    pub fn new(toolchain: &'a ToolchainSpec, packages: &'a [String], commonjs: bool) -> Self {
-        Self {
-            toolchain,
-            packages,
-            commonjs,
-        }
-    }
+impl NodeBackend<'_> {
     fn file_name(&self) -> &'static str {
         if self.commonjs {
             "snippet.cts"
@@ -73,15 +66,14 @@ impl Backend for NodeBackend<'_> {
         ];
         args.extend(arguments.iter().cloned());
         let fallback = std::env::temp_dir();
-        let result = run_final(
+        run_final(
             "vp",
             &args,
             Some(execution.cwd_or(&fallback)),
             &[],
             execution.environment(),
             quiet,
-        )?;
-        Ok(result.exit_code.unwrap_or(1))
+        )
     }
 
     fn prepare(
@@ -120,15 +112,14 @@ impl Backend for NodeBackend<'_> {
         )?;
 
         let final_args = final_command(dir, &source, version, arguments);
-        let result = run_final(
+        run_final(
             "vp",
             &final_args,
             Some(execution.cwd_or(dir)),
             &[],
             execution.environment(),
             quiet,
-        )?;
-        Ok(result.exit_code.unwrap_or(1))
+        )
     }
 }
 

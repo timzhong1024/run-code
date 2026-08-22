@@ -5,17 +5,9 @@ use crate::process::{RunFailure, run_checked, run_checked_hidden, run_final};
 use crate::util::{path_text, strings, write_source};
 use std::path::{Path, PathBuf};
 
-pub struct GoBackend<'a> {
-    toolchain: &'a ToolchainSpec,
-    packages: &'a [String],
-}
-impl<'a> GoBackend<'a> {
-    pub fn new(toolchain: &'a ToolchainSpec, packages: &'a [String]) -> Self {
-        Self {
-            toolchain,
-            packages,
-        }
-    }
+pub(super) struct GoBackend<'a> {
+    pub(super) toolchain: &'a ToolchainSpec,
+    pub(super) packages: &'a [String],
 }
 impl Backend for GoBackend<'_> {
     fn prepare(
@@ -58,7 +50,7 @@ impl Backend for GoBackend<'_> {
                 quiet,
             )?;
         }
-        let result = if execution.has_custom_cwd() {
+        if execution.has_custom_cwd() {
             let binary = snippet_binary(dir);
             let mut build = vec!["exec".into(), toolchain.clone()];
             build.extend(strings(&["--", "go", "build", "-o"]));
@@ -72,7 +64,7 @@ impl Backend for GoBackend<'_> {
                 &[],
                 execution.environment(),
                 quiet,
-            )?
+            )
         } else {
             let mut args = vec!["exec".into(), toolchain.clone()];
             args.extend(strings(&["--", "go", "run", "."]));
@@ -84,9 +76,8 @@ impl Backend for GoBackend<'_> {
                 &env,
                 execution.environment(),
                 quiet,
-            )?
-        };
-        Ok(result.exit_code.unwrap_or(1))
+            )
+        }
     }
 }
 

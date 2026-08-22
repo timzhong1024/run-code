@@ -7,17 +7,9 @@ use directories::ProjectDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub struct RustBackend<'a> {
-    toolchain: &'a ToolchainSpec,
-    packages: &'a [String],
-}
-impl<'a> RustBackend<'a> {
-    pub fn new(toolchain: &'a ToolchainSpec, packages: &'a [String]) -> Self {
-        Self {
-            toolchain,
-            packages,
-        }
-    }
+pub(super) struct RustBackend<'a> {
+    pub(super) toolchain: &'a ToolchainSpec,
+    pub(super) packages: &'a [String],
 }
 impl Backend for RustBackend<'_> {
     fn prepare(
@@ -75,15 +67,14 @@ impl Backend for RustBackend<'_> {
             args.push("--".into());
             args.extend(arguments.iter().cloned());
         }
-        let result = run_final(
+        run_final(
             "rustup",
             &args,
             Some(execution.cwd_or(dir)),
             &env,
             execution.environment(),
             quiet,
-        )?;
-        Ok(result.exit_code.unwrap_or(1))
+        )
     }
 }
 
