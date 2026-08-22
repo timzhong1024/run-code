@@ -1,32 +1,34 @@
 # run-code
 
-在隔离的临时环境中，用指定版本的 runtime/toolchain 和依赖快速运行一段 Python、TypeScript、JavaScript、Rust、Go 或 C# 代码。
+[简体中文](README_zh.md)
 
-## 安装
+Run Python, TypeScript, JavaScript, Rust, Go, or C# snippets with a selected runtime/toolchain version and temporary dependencies in an isolated environment.
 
-macOS 推荐使用 Homebrew：
+## Installation
+
+Homebrew is recommended on macOS:
 
 ```bash
 brew install timzhong1024/tap/run-code
 ```
 
-也可以通过 npm 安装预编译 binary：
+You can also install the prebuilt binary through npm:
 
 ```bash
 npm install --global @timzhong/run-code
 ```
 
-或者从源码安装：
+Or install from source:
 
 ```bash
 cargo install --locked --git https://github.com/timzhong1024/run-code
 ```
 
-GitHub Release 还会提供 macOS、Linux 和 Windows 的独立 binary。
+GitHub Releases also provide standalone binaries for macOS, Linux, and Windows.
 
-`run-code` 按语言调用外部工具；只需安装自己会使用的后端：
+`run-code` delegates to external tools for each language. Install only the backends you use:
 
-| 语言 | 必需工具 |
+| Language | Required tool |
 | --- | --- |
 | Python | [uv](https://docs.astral.sh/uv/getting-started/installation/) |
 | TypeScript / JavaScript | [Vite+ (`vp`)](https://viteplus.dev/guide/) |
@@ -34,7 +36,7 @@ GitHub Release 还会提供 macOS、Linux 和 Windows 的独立 binary。
 | Go | [mise](https://mise.jdx.dev/getting-started.html) |
 | C# / .NET | [mise](https://mise.jdx.dev/getting-started.html) |
 
-## 示例
+## Examples
 
 ### TypeScript
 
@@ -73,7 +75,7 @@ AnsiConsole.MarkupLine("[green]Hello from C#[/]");
 CS
 ```
 
-异步 Rust 可以为依赖指定 Cargo features：
+For asynchronous Rust, specify Cargo features in the dependency spec:
 
 ```bash
 run-code rust@stable --package 'tokio@1[full]' --clean <<'RS'
@@ -84,7 +86,7 @@ async fn main() {
 RS
 ```
 
-Windows PowerShell 7 使用单引号 here-string：
+In Windows PowerShell 7, use a single-quoted here-string:
 
 ```powershell
 @'
@@ -92,7 +94,7 @@ print("hello\nworld")
 '@ | run-code python@3.14 --clean
 ```
 
-Fish 不支持 heredoc，使用 `printf`：
+Fish does not support heredocs, so use `printf`:
 
 ```fish
 printf '%s\n' \
@@ -103,52 +105,52 @@ printf '%s\n' \
 
 ## Agent Skill
 
-`run-code skill` 从已安装的二进制中输出完整 `SKILL.md`。Agent 会先读取 skill 的名称和 description，在匹配任务后再读取完整内容。
+`run-code skill` prints the complete bundled `SKILL.md` from the installed binary. An agent can discover the skill by its name and description, then read the full instructions when the task matches.
 
-推荐安装到当前项目：
+Install it in the current project:
 
 ```bash
 mkdir -p .agents/skills/run-code-snippet
 run-code skill > .agents/skills/run-code-snippet/SKILL.md
 ```
 
-需要在所有项目中使用时，安装到用户目录：
+Or install it in your user directory to make it available across projects:
 
 ```bash
 mkdir -p ~/.agents/skills/run-code-snippet
 run-code skill > ~/.agents/skills/run-code-snippet/SKILL.md
 ```
 
-Codex 会自动发现这些目录中的 skill；详细约定见 [Codex Skills 文档](https://learn.chatgpt.com/docs/build-skills)。
+Codex automatically discovers skills in these directories. See the [Codex Skills documentation](https://learn.chatgpt.com/docs/build-skills) for details.
 
-## 为什么做这个项目
+## Why this project exists
 
-临时运行代码时，初始化项目、安装依赖和准备运行环境的成本很高；临时切换 runtime 或 toolchain 版本也很麻烦。直接安装依赖又容易污染全局环境或当前项目环境。
+Running a temporary snippet often means paying the setup cost of creating a project, installing dependencies, and preparing an environment. Switching to a different runtime or toolchain version for one task is also cumbersome, while installing packages globally or into an existing project creates unwanted state.
 
-已经有一些相似工具，但没有同时满足临时依赖、版本切换和隔离运行这些需求。`run-code` 受到这些代码片段运行器、版本管理器和临时包执行工具的启发，把这几个步骤统一成一个命令。
+Several related tools solve parts of this problem, but none matched the combination of temporary dependencies, version switching, and isolated execution needed here. Inspired by snippet runners, version managers, and temporary package executors, `run-code` combines those steps into one command.
 
-## 安全
+## Security
 
-`run-code` 提供的是环境和依赖隔离，不是安全沙箱。输入的代码和第三方依赖都以当前用户权限运行，可以访问本机文件、网络、环境变量和凭据。
+`run-code` provides environment and dependency isolation; it is not a security sandbox. Snippets and third-party dependencies run with the current user's permissions and may access local files, the network, environment variables, and credentials.
 
-依赖安装还可能执行 npm lifecycle scripts、Python build backend、Cargo `build.rs` 或其他生态的构建代码。只运行可信代码和依赖；使用陌生包前先检查官方文档与源码，敏感环境中固定版本，并避免暴露不必要的密钥。`--clean` 只删除临时项目，不会撤销代码已经产生的系统或网络副作用；各包管理器的下载缓存会继续保留。
+Dependency installation may execute npm lifecycle scripts, Python build backends, Cargo `build.rs` scripts, or other ecosystem-specific build code. Run only trusted code and dependencies. Inspect unfamiliar packages before use, pin versions in sensitive environments, and avoid exposing unnecessary secrets. `--clean` removes only the temporary project; it cannot undo system or network side effects, and package-manager download caches remain in place.
 
-漏洞请通过 GitHub private vulnerability reporting 私下提交；范围和报告方式见 [SECURITY.md](SECURITY.md)。
+Report vulnerabilities privately through GitHub private vulnerability reporting. See [SECURITY.md](SECURITY.md) for scope and reporting instructions.
 
-## 参数
+## CLI reference
 
 ```text
 run-code [OPTIONS] TOOLCHAIN[@VERSION]
 run-code skill
 ```
 
-- `TOOLCHAIN[@VERSION]`：选择语言及版本。支持 `python`、`node`、`rust`、`go` 和 `dotnet`；`csharp`、`cs` 是 `dotnet` 的别名，版本可以省略。
-- `-p, --package SPEC`：添加临时依赖，可重复使用以安装多个包。依赖格式遵循对应生态；Python 版本使用 `NAME==VERSION`，Node、Rust、Go 和 .NET 使用 `NAME@VERSION`。Rust 还支持 `NAME[@VERSION][FEATURE,...]`，例如 `'tokio@1[full]'`。
-- `--commonjs`：让 Node 以 CommonJS 方式运行；默认使用支持顶层 `await` 的 ESM。
-- `--clean`：运行结束后删除临时项目；不指定时保留项目，默认输出的执行命令中会包含项目路径。
-- `--quiet`：隐藏项目初始化、依赖安装及命令本身，只输出最终代码进程的 stdout/stderr。
-- `skill`：输出内置的 `run-code-snippet` Skill 内容。
-- `-h, --help`：显示帮助。
-- `-V, --version`：显示版本。
+- `TOOLCHAIN[@VERSION]`: Select a language and optional version. Supported toolchains are `python`, `node`, `rust`, `go`, and `dotnet`; `csharp` and `cs` are aliases for `dotnet`.
+- `-p, --package SPEC`: Add a temporary dependency. Repeat the option to install multiple packages. Specs follow each ecosystem: Python uses `NAME==VERSION`; Node, Rust, Go, and .NET use `NAME@VERSION`. Rust also supports `NAME[@VERSION][FEATURE,...]`, such as `'tokio@1[full]'`.
+- `--commonjs`: Run Node code as CommonJS. The default is ESM with top-level `await` support.
+- `--clean`: Delete the generated project after execution. Without this option, the project is retained and its path appears in the displayed command.
+- `--quiet`: Hide project setup, dependency installation, and command display; print only stdout/stderr from the final code process.
+- `skill`: Print the bundled `run-code-snippet` skill.
+- `-h, --help`: Show help.
+- `-V, --version`: Show the version.
 
-未指定版本时使用内置默认值：Python 3.14、Node latest、Rust stable、Go latest、.NET 10。C# 通过 .NET 10+ file-based app 运行。Python 和 Node 未指定 `--package` 时直接执行，不创建临时项目；需要依赖时才创建隔离项目。代码通过 stdin 输入，包管理器的下载缓存保持启用。默认只显示依赖安装和最终代码运行命令，并实时透传它们的 stdout/stderr；项目初始化仅在失败时输出诊断信息。
+When the version is omitted, built-in defaults are used: Python 3.14, Node latest, Rust stable, Go latest, and .NET 10. C# runs as a .NET 10+ file-based app. Python and Node execute directly without creating a project when no `--package` option is provided; an isolated project is created only when dependencies are needed. Source code is read from stdin, and package-manager download caches remain enabled. By default, `run-code` displays only dependency installation and final execution commands while streaming their stdout/stderr; project initialization output is shown only when initialization fails.
