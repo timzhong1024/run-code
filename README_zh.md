@@ -144,7 +144,7 @@ run-code [OPTIONS] TOOLCHAIN[@VERSION]
 run-code skill
 ```
 
-- `TOOLCHAIN[@VERSION]`：选择语言及版本。支持 `python`、`node`、`rust`、`go` 和 `dotnet`；`csharp`、`cs` 是 `dotnet` 的别名，版本可以省略。
+- `TOOLCHAIN[@VERSION]`：选择语言及版本。支持 `python`、`node`、`rust`、`go` 和 `dotnet`；`javascript`、`typescript` 是 `node` 的别名，`csharp`、`cs` 是 `dotnet` 的别名，版本可以省略。
 - `-p, --package SPEC`：添加临时依赖，可重复使用以安装多个包。依赖格式遵循对应生态；Python 版本使用 `NAME==VERSION`，Node、Rust、Go 和 .NET 使用 `NAME@VERSION`。Rust 还支持 `NAME[@VERSION][FEATURE,...]`，例如 `'tokio@1[full]'`。
 - `--commonjs`：让 Node 以 CommonJS 方式运行；默认使用支持顶层 `await` 的 ESM。
 - `--clean`：运行结束后删除临时项目；不指定时保留项目，默认输出的执行命令中会包含项目路径。

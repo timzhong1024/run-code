@@ -30,7 +30,7 @@ CODE
 '@ | run-code TOOLCHAIN[@VERSION] [--package SPEC ...] [--commonjs] [--clean] [--quiet]
 ```
 
-使用 `python`、`node`、`rust`、`go` 或 `dotnet`；`csharp` 和 `cs` 是 `dotnet` 的别名。省略版本时使用内置的最新稳定版本。Python 依赖版本使用 `NAME==VERSION`；Rust 依赖可用 `NAME[@VERSION][FEATURE,...]` 指定 Cargo features；.NET 依赖使用 NuGet 的 `NAME[@VERSION]`。Node 默认以 ESM 统一运行 JavaScript/TypeScript，仅在代码明确依赖 CommonJS 时添加 `--commonjs`。C# 使用 .NET 10+ file-based app。Python 和 Node 未指定 `--package` 时直接执行且不创建项目；指定依赖时才创建隔离项目。需要项目时默认保留；仅在明确只需一次结果时添加 `--clean`，仅需代码本身的输出时添加 `--quiet`。直接调用工具，不自行创建项目或检查运行环境。
+使用 `python`、`node`、`rust`、`go` 或 `dotnet`；`javascript` 和 `typescript` 是 `node` 的别名，`csharp` 和 `cs` 是 `dotnet` 的别名。省略版本时使用内置的最新稳定版本。Python 依赖版本使用 `NAME==VERSION`；Rust 依赖可用 `NAME[@VERSION][FEATURE,...]` 指定 Cargo features；.NET 依赖使用 NuGet 的 `NAME[@VERSION]`。Node 默认以 ESM 统一运行 JavaScript/TypeScript，仅在代码明确依赖 CommonJS 时添加 `--commonjs`。C# 使用 .NET 10+ file-based app。Python 和 Node 未指定 `--package` 时直接执行且不创建项目；指定依赖时才创建隔离项目。需要项目时默认保留；仅在明确只需一次结果时添加 `--clean`，仅需代码本身的输出时添加 `--quiet`。直接调用工具，不自行创建项目或检查运行环境。
 
 ## Examples
 
