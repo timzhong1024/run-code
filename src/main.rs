@@ -1,4 +1,5 @@
 mod cli;
+mod execution;
 mod process;
 mod runner;
 mod skill;
@@ -7,6 +8,7 @@ mod util;
 
 use clap::{Parser, error::ErrorKind};
 use cli::{Cli, Command};
+use execution::ExecutionContext;
 
 fn main() {
     let cli = match Cli::try_parse() {
@@ -28,6 +30,11 @@ fn main() {
         return;
     }
 
+    let execution = match ExecutionContext::load(&cli) {
+        Ok(execution) => execution,
+        Err(error) => return exit_with_error(&error, 2),
+    };
+
     let code = match source::read(cli.source.as_deref()) {
         Ok(code) => code,
         Err(error) => return exit_with_error(&error, 1),
@@ -41,7 +48,7 @@ fn main() {
         return exit_with_error(&format!("{input} did not contain source code"), 2);
     }
 
-    match runner::run_snippet(&cli, &code) {
+    match runner::run_snippet(&cli, &execution, &code) {
         Ok(exit_code) => exit(exit_code),
         Err(error) => {
             eprintln!("run-code: {}", error.message);

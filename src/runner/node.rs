@@ -1,7 +1,8 @@
 use super::Backend;
 use crate::cli::ToolchainSpec;
+use crate::execution::ExecutionContext;
 use crate::process::{RunFailure, run_checked, run_checked_hidden, run_final};
-use crate::util::{strings, write_source};
+use crate::util::{path_text, strings, write_source};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
@@ -36,7 +37,13 @@ impl Backend for NodeBackend<'_> {
         self.packages.is_empty()
     }
 
-    fn run_direct(&self, code: &str, arguments: &[String], quiet: bool) -> Result<i32, RunFailure> {
+    fn run_direct(
+        &self,
+        code: &str,
+        arguments: &[String],
+        execution: &ExecutionContext,
+        quiet: bool,
+    ) -> Result<i32, RunFailure> {
         let suffix = if self.commonjs { ".cts" } else { ".mts" };
         let source = Builder::new()
             .prefix("run-code-")
@@ -60,8 +67,15 @@ impl Backend for NodeBackend<'_> {
             source.path().to_string_lossy().into_owned(),
         ];
         args.extend(arguments.iter().cloned());
-        let cwd = std::env::temp_dir();
-        let result = run_final("vp", &args, Some(&cwd), &[], quiet)?;
+        let fallback = std::env::temp_dir();
+        let result = run_final(
+            "vp",
+            &args,
+            Some(execution.cwd_or(&fallback)),
+            &[],
+            execution.environment(),
+            quiet,
+        )?;
         Ok(result.exit_code.unwrap_or(1))
     }
 
@@ -70,6 +84,7 @@ impl Backend for NodeBackend<'_> {
         dir: &Path,
         code: &str,
         arguments: &[String],
+        execution: &ExecutionContext,
         quiet: bool,
     ) -> Result<i32, RunFailure> {
         let file = self.file_name();
@@ -121,10 +136,37 @@ impl Backend for NodeBackend<'_> {
             quiet,
         )?;
 
-        let final_args = final_command(file, arguments, quiet);
-        let result = run_final("vp", &final_args, Some(dir), &[], quiet)?;
+        let final_args = if execution.has_custom_cwd() {
+            final_command_from(dir, &source, version, arguments)
+        } else {
+            final_command(file, arguments, quiet)
+        };
+        let result = run_final(
+            "vp",
+            &final_args,
+            Some(execution.cwd_or(dir)),
+            &[],
+            execution.environment(),
+            quiet,
+        )?;
         Ok(result.exit_code.unwrap_or(1))
     }
+}
+
+fn final_command_from(
+    project_dir: &Path,
+    source: &Path,
+    version: &str,
+    arguments: &[String],
+) -> Vec<String> {
+    let tsx_cli = project_dir.join("node_modules/tsx/dist/cli.mjs");
+    let mut command = strings(&["env", "exec", "--node"]);
+    command.push(version.into());
+    command.push("node".into());
+    command.push(path_text(&tsx_cli));
+    command.push(path_text(source));
+    command.extend(arguments.iter().cloned());
+    command
 }
 
 fn final_command(file: &str, arguments: &[String], quiet: bool) -> Vec<String> {
@@ -152,5 +194,19 @@ mod tests {
             final_command("snippet.ts", &arguments, true),
             ["exec", "--", "tsx", "snippet.ts", "first", "--flag"]
         );
+    }
+
+    #[test]
+    fn custom_cwd_command_uses_absolute_project_tools_and_source() {
+        let project = Path::new("template");
+        let source = project.join("snippet.ts");
+        let command = final_command_from(project, &source, "20", &["first".into()]);
+        assert_eq!(&command[..5], ["env", "exec", "--node", "20", "node"]);
+        assert_eq!(
+            command[5],
+            path_text(&project.join("node_modules/tsx/dist/cli.mjs"))
+        );
+        assert_eq!(command[6], path_text(&source));
+        assert_eq!(command[7], "first");
     }
 }

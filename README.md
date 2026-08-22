@@ -46,6 +46,14 @@ run-code node@20 snippet.ts -- first --verbose
 
 The source file is read and its contents are copied into a newly created isolated template project before execution. `run-code` does not execute inside the source file's existing project, discover that project's dependencies, or copy sibling files. Add everything the snippet needs with `--package`; arguments after `--` are passed to the snippet.
 
+### Working directory and environment
+
+```bash
+run-code node@20 --cwd ./fixtures --env-file ./snippet.env snippet.ts
+```
+
+`--cwd` changes the working directory seen by the final snippet process. Template initialization and dependency installation still happen inside the isolated temporary project. `--env-file` loads dotenv-compatible variables for the final launch and snippet process; it does not modify the current shell or earlier setup and dependency-installation steps, and loaded values are omitted from displayed commands. Both paths are resolved from the directory where `run-code` was invoked.
+
 ### TypeScript
 
 ```bash
@@ -139,7 +147,7 @@ Several related tools solve parts of this problem, but none matched the combinat
 
 ## Security
 
-`run-code` provides environment and dependency isolation; it is not a security sandbox. Snippets and third-party dependencies run with the current user's permissions and may access local files, the network, environment variables, and credentials.
+`run-code` provides environment and dependency isolation; it is not a security sandbox. Snippets and third-party dependencies run with the current user's permissions and may access local files, the network, environment variables, and credentials. Variables loaded with `--env-file` are deliberately available to the snippet, so do not pass secrets to untrusted code.
 
 Dependency installation may execute npm lifecycle scripts, Python build backends, Cargo `build.rs` scripts, or other ecosystem-specific build code. Run only trusted code and dependencies. Inspect unfamiliar packages before use, pin versions in sensitive environments, and avoid exposing unnecessary secrets. `--clean` removes only the temporary project; it cannot undo system or network side effects, and package-manager download caches remain in place.
 
@@ -157,6 +165,8 @@ run-code skill
 - `FILE`: Read a source file and copy its contents into a new isolated template project. The file's existing project and sibling files are not used. When omitted, source code is read from stdin.
 - `ARG`: Pass arguments after `--` to the snippet process. This also works with stdin input.
 - `-p, --package SPEC`: Add a temporary dependency. Repeat the option to install multiple packages. Specs follow each ecosystem: Python uses `NAME==VERSION`; Node, Rust, Go, and .NET use `NAME@VERSION`. Rust also supports `NAME[@VERSION][FEATURE,...]`, such as `'tokio@1[full]'`.
+- `--cwd DIR`: Set the final snippet process's working directory. Template setup and dependency installation remain isolated from this directory.
+- `--env-file FILE`: Load dotenv-compatible variables for the final launch and snippet process. Values override inherited variables with the same name and are not printed in displayed commands; runner-owned isolation variables take precedence.
 - `--commonjs`: Run Node code as CommonJS. The default is ESM with top-level `await` support.
 - `--clean`: Delete the generated project after execution. Without this option, the project is retained and its path appears in the displayed command.
 - `--quiet`: Hide project setup, dependency installation, and command display; print only stdout/stderr from the final code process.

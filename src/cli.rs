@@ -101,6 +101,14 @@ pub struct Cli {
     #[arg(last = true, value_name = "ARG")]
     pub args: Vec<String>,
 
+    /// Working directory for the final code process
+    #[arg(long, value_name = "DIR")]
+    pub cwd: Option<PathBuf>,
+
+    /// Load environment variables for the final code process
+    #[arg(long, value_name = "FILE")]
+    pub env_file: Option<PathBuf>,
+
     /// Dependency specification; Python supports NAME==VERSION
     #[arg(short = 'p', long = "package", value_name = "SPEC")]
     pub packages: Vec<String>,
@@ -140,6 +148,8 @@ impl Cli {
                 || self.quiet
                 || self.source.is_some()
                 || !self.args.is_empty()
+                || self.cwd.is_some()
+                || self.env_file.is_some()
             {
                 Some("the skill command does not accept execution arguments".into())
             } else {
@@ -164,7 +174,7 @@ mod tests {
             .get_arguments()
             .filter(|arg| arg.get_id() != "help" && arg.get_id() != "version")
             .count();
-        assert_eq!(visible, 7);
+        assert_eq!(visible, 9);
     }
 
     #[test]
@@ -188,6 +198,21 @@ mod tests {
         let cli = Cli::try_parse_from(["run-code", "python", "--", "first"]).unwrap();
         assert!(cli.source.is_none());
         assert_eq!(cli.args, ["first"]);
+    }
+
+    #[test]
+    fn execution_context_options_accept_paths() {
+        let cli = Cli::try_parse_from([
+            "run-code",
+            "python",
+            "--cwd",
+            "data",
+            "--env-file",
+            "snippet.env",
+        ])
+        .unwrap();
+        assert_eq!(cli.cwd, Some(PathBuf::from("data")));
+        assert_eq!(cli.env_file, Some(PathBuf::from("snippet.env")));
     }
 
     #[test]
