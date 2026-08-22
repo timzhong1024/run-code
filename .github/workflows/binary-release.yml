@@ -1,0 +1,157 @@
+name: Binary Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Match tag to Cargo version
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "run-code") | .version')"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo version $version" >&2
+            exit 1
+          fi
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            suffix: ""
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            suffix: ""
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            suffix: ""
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: .exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Test
+        run: cargo test --locked
+      - name: Build release binary
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir -p package dist
+          cp "target/${{ matrix.target }}/release/run-code${{ matrix.suffix }}" package/
+          cp LICENSE README.md package/
+          if [[ "${{ runner.os }}" != "Windows" ]]; then
+            chmod +x "package/run-code${{ matrix.suffix }}"
+          fi
+          "./package/run-code${{ matrix.suffix }}" --version
+          tar -C package -czf "dist/run-code-${{ matrix.target }}.tar.gz" \
+            "run-code${{ matrix.suffix }}" LICENSE README.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/run-code-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: binary-*
+          path: dist
+          merge-multiple: true
+      - name: Create checksums
+        run: sha256sum dist/*.tar.gz > dist/SHA256SUMS
+      - name: Save release metadata
+        run: |
+          mkdir -p metadata
+          printf '%s\n' "$GITHUB_REF_NAME" > metadata/tag.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-metadata
+          path: metadata/tag.txt
+          retention-days: 7
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --verify-tag \
+              --generate-notes \
+              --title "$GITHUB_REF_NAME"
+          fi
+
+  homebrew:
+    name: Update Homebrew tap
+    needs: release
+    runs-on: ubuntu-24.04
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: binary-*
+          path: dist
+          merge-multiple: true
+      - name: Generate formula
+        run: |
+          scripts/render-homebrew-formula.sh \
+            "$GITHUB_REF_NAME" \
+            "$GITHUB_REPOSITORY" \
+            dist \
+            generated/run-code.rb
+          ruby -c generated/run-code.rb
+      - name: Explain missing tap token
+        if: env.TAP_TOKEN == ''
+        run: echo "Set the HOMEBREW_TAP_TOKEN repository secret to publish formula updates."
+      - name: Check out tap
+        if: env.TAP_TOKEN != ''
+        uses: actions/checkout@v7
+        with:
+          repository: timzhong1024/homebrew-tap
+          token: ${{ env.TAP_TOKEN }}
+          path: tap
+      - name: Publish formula
+        if: env.TAP_TOKEN != ''
+        run: |
+          mkdir -p tap/Formula
+          cp generated/run-code.rb tap/Formula/run-code.rb
+          cd tap
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -- Formula/run-code.rb
+          if git diff --cached --quiet; then
+            echo "Formula is already current"
+          else
+            git commit -m "Update run-code to $GITHUB_REF_NAME"
+            git push
+          fi

@@ -1,0 +1,19 @@
+[package]
+name = "run-code"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Run code from stdin with selected toolchains and temporary dependencies"
+license = "MIT"
+repository = "https://github.com/timzhong1024/run-code"
+homepage = "https://github.com/timzhong1024/run-code"
+readme = "README.md"
+keywords = ["cli", "snippets", "toolchain", "python", "typescript"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = [".github", "npm"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+directories = "6"
+serde_json = "1"
+tempfile = "3"

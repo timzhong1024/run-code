@@ -1,0 +1,97 @@
+name: npm Publish
+
+on:
+  workflow_run:
+    workflows:
+      - Binary Release
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Download release binaries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: binary-*
+          path: dist
+          merge-multiple: true
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Download release metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: release-metadata
+          path: metadata
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Read release version
+        shell: bash
+        run: |
+          tag="$(cat metadata/tag.txt)"
+          printf 'NPM_VERSION=%s\n' "${tag#v}" >> "$GITHUB_ENV"
+      - name: Update npm package metadata
+        working-directory: npm
+        run: |
+          npm version "$NPM_VERSION" --no-git-tag-version
+          npm pkg set "repository.url=https://github.com/${GITHUB_REPOSITORY}.git"
+      - name: Assemble npm package
+        shell: bash
+        run: |
+          rm -rf npm/vendor
+          for archive in dist/run-code-*.tar.gz; do
+            target="${archive#dist/run-code-}"
+            target="${target%.tar.gz}"
+            mkdir -p "npm/vendor/$target"
+            tar -xzf "$archive" -C "npm/vendor/$target"
+          done
+          expected=(
+            npm/vendor/aarch64-apple-darwin/run-code
+            npm/vendor/aarch64-unknown-linux-gnu/run-code
+            npm/vendor/x86_64-apple-darwin/run-code
+            npm/vendor/x86_64-pc-windows-msvc/run-code.exe
+            npm/vendor/x86_64-unknown-linux-gnu/run-code
+          )
+          for binary in "${expected[@]}"; do
+            if [[ ! -f "$binary" ]]; then
+              echo "missing release binary: $binary" >&2
+              exit 1
+            fi
+          done
+          chmod +x npm/bin/run-code.js npm/vendor/*/run-code
+      - name: Validate npm package
+        working-directory: npm
+        run: npm pack --dry-run
+      - name: Publish to npm
+        shell: bash
+        working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already published"
+          else
+            npm publish --access public --provenance
+          fi

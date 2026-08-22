@@ -1,0 +1,4 @@
+interface:
+  display_name: "临时运行代码片段"
+  short_description: "指定版本和依赖运行 Python、JS、TS、Rust、Go 或 C# 代码"
+  default_prompt: "Use $run-code-snippet to run this code with the requested toolchain and dependencies."

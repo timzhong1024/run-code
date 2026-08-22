@@ -1,0 +1,218 @@
+#[cfg(test)]
+use clap::CommandFactory;
+use clap::{Parser, Subcommand};
+use std::str::FromStr;
+
+pub const DEFAULT_PYTHON_TOOLCHAIN: &str = "3.14";
+pub const DEFAULT_NODE_TOOLCHAIN: &str = "latest";
+pub const DEFAULT_RUST_TOOLCHAIN: &str = "stable";
+pub const DEFAULT_GO_TOOLCHAIN: &str = "latest";
+pub const DEFAULT_DOTNET_TOOLCHAIN: &str = "10";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolchainKind {
+    Python,
+    Node,
+    Rust,
+    Go,
+    Dotnet,
+}
+
+#[derive(Debug, Clone)]
+pub struct ToolchainSpec {
+    pub kind: ToolchainKind,
+    pub version: String,
+}
+
+#[cfg(test)]
+impl ToolchainSpec {
+    pub fn name(&self) -> &'static str {
+        match self.kind {
+            ToolchainKind::Python => "python",
+            ToolchainKind::Node => "node",
+            ToolchainKind::Rust => "rust",
+            ToolchainKind::Go => "go",
+            ToolchainKind::Dotnet => "dotnet",
+        }
+    }
+
+    pub fn display(&self) -> String {
+        format!("{}@{}", self.name(), self.version)
+    }
+}
+
+impl FromStr for ToolchainSpec {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (name, requested_version) = match value.split_once('@') {
+            Some((name, version)) if !name.is_empty() && !version.is_empty() => {
+                (name, Some(version))
+            }
+            Some(_) => return Err(format!("invalid toolchain specification: {value}")),
+            None => (value, None),
+        };
+        let kind = match name {
+            "python" | "py" => ToolchainKind::Python,
+            "node" => ToolchainKind::Node,
+            "rust" => ToolchainKind::Rust,
+            "go" => ToolchainKind::Go,
+            "dotnet" | "csharp" | "cs" => ToolchainKind::Dotnet,
+            _ => {
+                return Err(format!(
+                    "unsupported toolchain {name:?}; expected python, node, rust, go, or dotnet"
+                ));
+            }
+        };
+        let default = match kind {
+            ToolchainKind::Python => DEFAULT_PYTHON_TOOLCHAIN,
+            ToolchainKind::Node => DEFAULT_NODE_TOOLCHAIN,
+            ToolchainKind::Rust => DEFAULT_RUST_TOOLCHAIN,
+            ToolchainKind::Go => DEFAULT_GO_TOOLCHAIN,
+            ToolchainKind::Dotnet => DEFAULT_DOTNET_TOOLCHAIN,
+        };
+        Ok(Self {
+            kind,
+            version: requested_version.unwrap_or(default).to_string(),
+        })
+    }
+}
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "run-code",
+    version,
+    about = "Run stdin with a selected toolchain and temporary dependencies"
+)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<Command>,
+
+    /// Runtime/compiler in NAME or NAME@VERSION form
+    #[arg(value_name = "TOOLCHAIN[@VERSION]")]
+    pub toolchain: Option<ToolchainSpec>,
+
+    /// Dependency specification; Python supports NAME==VERSION
+    #[arg(short = 'p', long = "package", value_name = "SPEC")]
+    pub packages: Vec<String>,
+
+    /// Run Node code as CommonJS instead of the default ESM
+    #[arg(long)]
+    pub commonjs: bool,
+
+    /// Delete the generated project after the first run
+    #[arg(long)]
+    pub clean: bool,
+
+    /// Only print stdout and stderr from the final code process
+    #[arg(long)]
+    pub quiet: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Print the installable Codex skill to stdout
+    Skill,
+}
+
+impl Cli {
+    pub fn toolchain(&self) -> &ToolchainSpec {
+        self.toolchain
+            .as_ref()
+            .expect("toolchain is validated before execution")
+    }
+
+    pub fn validation_error(&self) -> Option<String> {
+        if self.command.is_some() {
+            if self.toolchain.is_some()
+                || !self.packages.is_empty()
+                || self.commonjs
+                || self.clean
+                || self.quiet
+            {
+                Some("the skill command does not accept execution arguments".into())
+            } else {
+                None
+            }
+        } else if self.toolchain.is_none() {
+            Some("missing required TOOLCHAIN[@VERSION] or the skill command".into())
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_surface_stays_small() {
+        let command = Cli::command();
+        let visible = command
+            .get_arguments()
+            .filter(|arg| arg.get_id() != "help" && arg.get_id() != "version")
+            .count();
+        assert_eq!(visible, 5);
+    }
+
+    #[test]
+    fn positional_toolchain_accepts_a_version() {
+        let cli = Cli::try_parse_from(["run-code", "node@20", "--commonjs"]).unwrap();
+        assert_eq!(cli.toolchain().display(), "node@20");
+        assert!(cli.commonjs);
+    }
+
+    #[test]
+    fn skill_is_a_command_without_a_toolchain() {
+        let cli = Cli::try_parse_from(["run-code", "skill"]).unwrap();
+        assert!(matches!(cli.command, Some(Command::Skill)));
+        assert!(cli.validation_error().is_none());
+    }
+
+    #[test]
+    fn quiet_uses_the_conventional_spelling() {
+        assert!(
+            Cli::try_parse_from(["run-code", "python", "--quiet"])
+                .unwrap()
+                .quiet
+        );
+        assert!(Cli::try_parse_from(["run-code", "python", "--quite"]).is_err());
+    }
+
+    #[test]
+    fn omitted_versions_use_stable_policy() {
+        assert_eq!(
+            "python".parse::<ToolchainSpec>().unwrap().display(),
+            "python@3.14"
+        );
+        assert_eq!(
+            "node".parse::<ToolchainSpec>().unwrap().display(),
+            "node@latest"
+        );
+        assert_eq!(
+            "rust".parse::<ToolchainSpec>().unwrap().display(),
+            "rust@stable"
+        );
+        assert_eq!(
+            "go".parse::<ToolchainSpec>().unwrap().display(),
+            "go@latest"
+        );
+        assert_eq!(
+            "dotnet".parse::<ToolchainSpec>().unwrap().display(),
+            "dotnet@10"
+        );
+    }
+
+    #[test]
+    fn csharp_aliases_select_dotnet() {
+        assert_eq!(
+            "csharp@10".parse::<ToolchainSpec>().unwrap().display(),
+            "dotnet@10"
+        );
+        assert_eq!(
+            "cs".parse::<ToolchainSpec>().unwrap().display(),
+            "dotnet@10"
+        );
+    }
+}

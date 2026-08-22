@@ -1,0 +1,24 @@
+{
+  "name": "@timzhong/run-code",
+  "version": "0.0.0-development",
+  "description": "Run temporary Python, TypeScript, JavaScript, Rust, Go, or C# snippets with pinned toolchains and dependencies",
+  "type": "module",
+  "bin": {
+    "run-code": "bin/run-code.js"
+  },
+  "files": [
+    "bin",
+    "vendor"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/timzhong1024/run-code.git"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
