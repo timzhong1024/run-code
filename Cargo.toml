@@ -10,7 +10,7 @@ homepage = "https://github.com/timzhong1024/run-code"
 readme = "README.md"
 keywords = ["cli", "snippets", "toolchain", "python", "typescript"]
 categories = ["command-line-utilities", "development-tools"]
-exclude = [".github", "npm"]
+exclude = [".github", "npm", "scripts"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

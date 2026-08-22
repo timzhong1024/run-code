@@ -113,8 +113,6 @@ jobs:
     name: Update Homebrew tap
     needs: release
     runs-on: ubuntu-24.04
-    env:
-      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -130,18 +128,13 @@ jobs:
             dist \
             generated/run-code.rb
           ruby -c generated/run-code.rb
-      - name: Explain missing tap token
-        if: env.TAP_TOKEN == ''
-        run: echo "Set the HOMEBREW_TAP_TOKEN repository secret to publish formula updates."
       - name: Check out tap
-        if: env.TAP_TOKEN != ''
         uses: actions/checkout@v7
         with:
           repository: timzhong1024/homebrew-tap
-          token: ${{ env.TAP_TOKEN }}
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           path: tap
       - name: Publish formula
-        if: env.TAP_TOKEN != ''
         run: |
           mkdir -p tap/Formula
           cp generated/run-code.rb tap/Formula/run-code.rb

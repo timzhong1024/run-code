@@ -133,6 +133,8 @@ Codex 会自动发现这些目录中的 skill；详细约定见 [Codex Skills �
 
 依赖安装还可能执行 npm lifecycle scripts、Python build backend、Cargo `build.rs` 或其他生态的构建代码。只运行可信代码和依赖；使用陌生包前先检查官方文档与源码，敏感环境中固定版本，并避免暴露不必要的密钥。`--clean` 只删除临时项目，不会撤销代码已经产生的系统或网络副作用；各包管理器的下载缓存会继续保留。
 
+漏洞请通过 GitHub private vulnerability reporting 私下提交；范围和报告方式见 [SECURITY.md](SECURITY.md)。
+
 ## 参数
 
 ```text
