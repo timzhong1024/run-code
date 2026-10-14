@@ -5,7 +5,7 @@
 Run a disposable Python, TypeScript/JavaScript, Rust, Go, or C# snippet with a selected runtime version and temporary dependencies—without modifying your global environment or current project.
 
 ```bash
-echo 'print("hello")' | run-code python@3.14
+echo 'print("hello")' | run-code python@3.15
 ```
 
 ## Why run-code exists
@@ -93,7 +93,7 @@ TS
 ### Python with a PyPI package
 
 ```bash
-run-code python@3.14 --package requests==2.32.5 --clean <<'PY'
+run-code python@3.15 --package requests==2.32.5 --clean <<'PY'
 import requests
 print(requests.__version__)
 PY
@@ -123,7 +123,7 @@ The file is copied into a fresh isolated template; its existing project, depende
 
 ## Execution behavior
 
-- Omitting a version selects the built-in stable policy: Python 3.14, Node latest, Rust stable, Go latest, and .NET 10.
+- Omitting a version selects the built-in stable policy: Python 3.15, Node latest, Rust stable, Go latest, and .NET 10.
 - Python and Node stdin snippets without `--package` run directly; dependencies or file input use an isolated template project.
 - Temporary projects are retained by default so their generated command paths remain inspectable. Add `--clean` for a one-off run.
 - Package-manager download caches remain enabled, so isolation does not mean downloading every package again.
@@ -169,7 +169,7 @@ PowerShell 7 can pipe a single-quoted here-string:
 ```powershell
 @'
 print("hello\nworld")
-'@ | run-code python@3.14 --clean
+'@ | run-code python@3.15 --clean
 ```
 
 ## Security

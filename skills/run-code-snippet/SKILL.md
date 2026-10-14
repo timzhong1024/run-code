@@ -47,14 +47,14 @@ CODE
 ```bash
 run-code node@20 snippet.ts -- first --verbose
 
-run-code python@3.14 --cwd ./fixtures --env-file ./snippet.env snippet.py
+run-code python@3.15 --cwd ./fixtures --env-file ./snippet.env snippet.py
 
 run-code node@20 --package zod@4 --clean <<'TS'
 import { z } from "zod";
 console.log(z.object({ id: z.number() }).parse({ id: 1 }));
 TS
 
-run-code python@3.14 --package httpx --clean <<'PY'
+run-code python@3.15 --package httpx --clean <<'PY'
 import httpx
 print(httpx.URL("https://example.com").host)
 PY

@@ -5,7 +5,7 @@
 使用指定版本的 runtime/toolchain 和临时依赖，运行一段一次性的 Python、TypeScript/JavaScript、Rust、Go 或 C# 代码，同时不修改全局环境或当前项目。
 
 ```bash
-echo 'print("hello")' | run-code python@3.14
+echo 'print("hello")' | run-code python@3.15
 ```
 
 ## 为什么需要 run-code
@@ -93,7 +93,7 @@ TS
 ### 使用 PyPI 包的 Python
 
 ```bash
-run-code python@3.14 --package requests==2.32.5 --clean <<'PY'
+run-code python@3.15 --package requests==2.32.5 --clean <<'PY'
 import requests
 print(requests.__version__)
 PY
@@ -123,7 +123,7 @@ run-code node@20 \
 
 ## 执行行为
 
-- 省略版本时使用内置的稳定策略：Python 3.14、Node latest、Rust stable、Go latest、.NET 10。
+- 省略版本时使用内置的稳定策略：Python 3.15、Node latest、Rust stable、Go latest、.NET 10。
 - Python 和 Node 从 stdin 读取且没有 `--package` 时直接运行；有依赖或使用源文件时会创建隔离模板项目。
 - 临时项目默认保留，方便检查输出命令中的生成路径；只运行一次时添加 `--clean`。
 - 包管理器下载缓存保持启用，因此隔离运行不等于每次重新下载所有依赖。
@@ -169,7 +169,7 @@ PowerShell 7 可以使用单引号 here-string：
 ```powershell
 @'
 print("hello\nworld")
-'@ | run-code python@3.14 --clean
+'@ | run-code python@3.15 --clean
 ```
 
 ## 安全
