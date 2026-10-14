@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
 
-pub const DEFAULT_PYTHON_TOOLCHAIN: &str = "3.14";
+pub const DEFAULT_PYTHON_TOOLCHAIN: &str = "3.15";
 pub const DEFAULT_NODE_TOOLCHAIN: &str = "latest";
 pub const DEFAULT_RUST_TOOLCHAIN: &str = "stable";
 pub const DEFAULT_GO_TOOLCHAIN: &str = "latest";
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn omitted_versions_use_stable_policy() {
-        assert_toolchain("python", ToolchainKind::Python, "3.14");
+        assert_toolchain("python", ToolchainKind::Python, "3.15");
         assert_toolchain("node", ToolchainKind::Node, "latest");
         assert_toolchain("rust", ToolchainKind::Rust, "stable");
         assert_toolchain("go", ToolchainKind::Go, "latest");
